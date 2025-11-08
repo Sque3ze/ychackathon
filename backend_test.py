@@ -7,7 +7,7 @@ import threading
 import time
 
 class TldrawAPITester:
-    def __init__(self, base_url="https://collab-canvas-25.preview.emergentagent.com"):
+    def __init__(self, base_url="https://drawsync.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
