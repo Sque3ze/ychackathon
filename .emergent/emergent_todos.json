@@ -1,11 +1,11 @@
 [
   {
     "content": "Research tldraw sync protocol and best practices for WebSocket implementation",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Install tldraw and @tldraw/sync packages in frontend",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Backend: Create MongoDB models for rooms and operations with UUID support",
