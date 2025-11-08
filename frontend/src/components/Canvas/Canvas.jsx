@@ -186,7 +186,12 @@ export default function Canvas({ roomId }) {
         clearTimeout(snapshotSaveTimeout.current);
       }
     };
-  }, [store, roomId]);
+  }, [store, editor, roomId]);
+
+  // Handle editor mount
+  const handleMount = (mountedEditor) => {
+    setEditor(mountedEditor);
+  };
 
   if (!store) {
     return (
@@ -203,6 +208,7 @@ export default function Canvas({ roomId }) {
       <Tldraw 
         store={store}
         autoFocus
+        onMount={handleMount}
       />
     </div>
   );
