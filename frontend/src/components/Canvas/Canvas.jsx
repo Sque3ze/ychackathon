@@ -136,7 +136,7 @@ export default function Canvas({ roomId }) {
 
   // Listen to store changes and broadcast
   useEffect(() => {
-    if (!store || !wsRef.current) return;
+    if (!store || !wsRef.current || !editor) return;
 
     const handleStoreChange = () => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -159,7 +159,8 @@ export default function Canvas({ roomId }) {
         }
         snapshotSaveTimeout.current = setTimeout(async () => {
           try {
-            const snapshot = store.getSnapshot();
+            // Use tldraw v4 API to get snapshot
+            const snapshot = getSnapshot(editor.store);
             await fetch(`${backendUrl}/api/sync/rooms/${roomId}/apply`, {
               method: 'POST',
               headers: {
