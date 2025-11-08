@@ -5,43 +5,43 @@
   },
   {
     "content": "Install tldraw and @tldraw/sync packages in frontend",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Backend: Create MongoDB models for rooms and operations with UUID support",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Backend: Implement /api/ws/rooms/default WebSocket endpoint for real-time sync",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Backend: Implement /api/sync/rooms/default/snapshot GET endpoint",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Backend: Implement /api/sync/rooms/default/apply POST endpoint for persisting updates",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Set up basic full-viewport tldraw canvas component",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Implement sync adapter to connect tldraw with backend (snapshot load + WS streaming)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add connection status indicator with Sonner toasts",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Apply design system (Inter font, CSS variables, color tokens) to index.css",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test POC: Open two browser tabs and verify bi-directional sync works",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Test POC: Verify persistence works on page refresh",
