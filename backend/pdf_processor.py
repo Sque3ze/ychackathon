@@ -8,7 +8,7 @@ import uuid
 from typing import List, Dict, Optional
 from datetime import datetime, timezone
 import pdfplumber
-from openai import OpenAI
+from litellm import embedding
 from supabase import create_client, Client
 import logging
 
