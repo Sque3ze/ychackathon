@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import {
   Tldraw,
   DefaultToolbar,
@@ -56,14 +56,50 @@ const customShapeUtils = [
   MeetingSummaryShapeUtil,
 ];
 
+const collectTextShapeIds = (seedIds, editor) => {
+  const visited = new Set();
+  const textIds = new Set();
+  const queue = [...seedIds];
+
+  while (queue.length) {
+    const currentId = queue.pop();
+    if (!currentId || visited.has(currentId)) continue;
+    visited.add(currentId);
+
+    const shape = editor.getShape(currentId);
+    if (!shape) continue;
+
+    if (shape.type === "text") {
+      textIds.add(shape.id);
+      continue;
+    }
+
+    const childIds = editor.getSortedChildIds?.(shape.id) ?? [];
+    queue.push(...childIds);
+  }
+
+  return Array.from(textIds);
+};
+
 export default function Canvas() {
   const editorRef = useRef(null);
+  const typedNoteSyncTimers = useRef({});
 
   // Use tldraw's built-in demo sync with custom shapes
   const store = useSyncDemo({
     roomId: DEFAULT_ROOM_ID,
     shapeUtils: customShapeUtils,
   });
+
+  useEffect(() => {
+    return () => {
+      Object.values(typedNoteSyncTimers.current).forEach((timer) => {
+        if (timer) {
+          clearTimeout(timer);
+        }
+      });
+    };
+  }, []);
 
   // Handle video call join - create as draggable canvas shape
   const handleJoinVideoCall = async () => {
@@ -166,6 +202,19 @@ export default function Canvas() {
         editor.deleteShapes(arrowsToRemove.map((arrow) => arrow.id));
       }
     });
+
+    editor.sideEffects.registerAfterChangeHandler("shape", (prev, next) => {
+      if (!next || next.type !== "text") {
+        return;
+      }
+      if (prev?.props?.text === next.props?.text) {
+        return;
+      }
+      const frameId = findTypedFrameAncestor(editor, next.id);
+      if (frameId) {
+        scheduleTypedNoteSync(frameId, editor);
+      }
+    });
   };
 
   const handleUploadSuccess = (documentData) => {
@@ -238,19 +287,258 @@ export default function Canvas() {
         continue;
       }
 
-      const childIds = editor.getSortedChildIds?.(shape.id) ?? [];
+      const childIds = editor.getSortedChildIdsForParent
+        ? [...editor.getSortedChildIdsForParent(shape.id)]
+        : [];
       queue.push(...childIds);
     }
 
     return Array.from(strokes);
   };
 
+  // Helper function to extract plain text from tldraw's richText structure (ProseMirror format)
+  const extractTextFromRichText = (richText) => {
+    if (!richText || typeof richText !== "object") {
+      return "";
+    }
+    
+    // If it's a text node, return the text directly
+    if (richText.type === "text" && richText.text) {
+      return richText.text;
+    }
+    
+    // If it has content array, recursively extract text from all children
+    if (Array.isArray(richText.content)) {
+      return richText.content
+        .map((node) => extractTextFromRichText(node))
+        .join("");
+    }
+    
+    return "";
+  };
+
+  const gatherTextShapesUnderFrame = (editor, frameId) => {
+    const results = [];
+    const stack = editor.getSortedChildIdsForParent
+      ? [...editor.getSortedChildIdsForParent(frameId)]
+      : [];
+
+    while (stack.length) {
+      const currentId = stack.pop();
+      const shape = editor.getShape(currentId);
+      if (!shape) continue;
+
+      if (shape.type === "text") {
+        const bounds = editor.getShapePageBounds(shape.id);
+        
+        // Extract text from tldraw text shapes
+        // tldraw stores text in richText structure (ProseMirror format)
+        let textContent = "";
+        
+        // Method 1: Extract from richText structure (most common in newer tldraw)
+        if (shape.props?.richText) {
+          textContent = extractTextFromRichText(shape.props.richText);
+        }
+        
+        // Method 2: Direct props.text (fallback for older format)
+        if (!textContent && shape.props?.text) {
+          textContent = typeof shape.props.text === "string" 
+            ? shape.props.text 
+            : String(shape.props.text);
+        }
+        
+        // Method 3: Try using editor API if available
+        if (!textContent && editor.getShapeUtil) {
+          try {
+            const util = editor.getShapeUtil(shape.type);
+            if (util && typeof util.getTextContent === "function") {
+              textContent = util.getTextContent(shape) || "";
+            }
+          } catch (e) {
+            // Ignore errors
+          }
+        }
+        
+        results.push({
+          id: shape.id,
+          text: textContent,
+          props: {
+            font: shape.props?.font,
+            size: shape.props?.size,
+            color: shape.props?.color,
+            align: shape.props?.align,
+            // Include all props for debugging
+            ...shape.props,
+          },
+          bounds,
+        });
+        continue;
+      }
+
+      const childIds = editor.getSortedChildIdsForParent
+        ? [...editor.getSortedChildIdsForParent(shape.id)]
+        : [];
+      stack.push(...childIds);
+    }
+
+    results.sort((a, b) => {
+      const aBounds = a.bounds;
+      const bBounds = b.bounds;
+      const ay = aBounds ? aBounds.y : 0;
+      const by = bBounds ? bBounds.y : 0;
+      if (ay === by) {
+        const ax = aBounds ? aBounds.x : 0;
+        const bx = bBounds ? bBounds.x : 0;
+        return ax - bx;
+      }
+      return ay - by;
+    });
+
+    return results.map((entry, index) => ({
+      ...entry,
+      order: index,
+    }));
+  };
+
+  const findTypedFrameAncestor = (editor, shapeId) => {
+    let current = editor.getShape(shapeId);
+    while (current) {
+      if (
+        current.type === "frame" &&
+        current.meta?.typedNoteId === current.id
+      ) {
+        return current.id;
+      }
+      const parent = editor.getShapeParent(current);
+      if (!parent) break;
+      current = parent;
+    }
+    return null;
+  };
+
+  const syncTypedNote = async (frameId, editor) => {
+    if (!editor || !frameId) return;
+    const frame = editor.getShape(frameId);
+    if (!frame) return;
+
+    const textShapes = gatherTextShapesUnderFrame(editor, frameId);
+    if (!textShapes.length) return;
+
+    editor.run(() => {
+      const frameBounds = editor.getShapePageBounds(frameId);
+      if (!frameBounds) return;
+
+      let newWidth = 0;
+      let newHeight = 0;
+      const padding = 24;
+
+      textShapes.forEach(({ bounds }) => {
+        if (!bounds) return;
+        const relativeRight = bounds.x + bounds.w - frameBounds.x;
+        const relativeBottom = bounds.y + bounds.h - frameBounds.y;
+        newWidth = Math.max(newWidth, relativeRight + padding);
+        newHeight = Math.max(newHeight, relativeBottom + padding);
+      });
+
+      const minWidth = 240;
+      const minHeight = 160;
+      const finalWidth = Math.max(newWidth, minWidth);
+      const finalHeight = Math.max(newHeight, minHeight);
+
+      if (
+        Math.abs(finalWidth - (frame.props?.w ?? 0)) > 1 ||
+        Math.abs(finalHeight - (frame.props?.h ?? 0)) > 1
+      ) {
+        editor.updateShape({
+          id: frame.id,
+          type: frame.type,
+          props: {
+            ...frame.props,
+            w: finalWidth,
+            h: finalHeight,
+          },
+        });
+      }
+    });
+
+    const updatedFrame = editor.getShape(frameId);
+    if (!updatedFrame) return;
+
+    const backendUrl = process.env.REACT_APP_BACKEND_URL || "";
+    if (!backendUrl) {
+      console.warn("REACT_APP_BACKEND_URL is not set; skipping typed note sync.");
+      return;
+    }
+
+    const payloadShapes = textShapes.map((entry) => {
+      // Debug: log what we're extracting
+      console.log("Text shape entry:", {
+        id: entry.id,
+        text: entry.text,
+        props: entry.props,
+        fullEntry: entry,
+      });
+      
+      return {
+        shapeId: entry.id,
+        text: entry.text,
+        order: entry.order,
+        // Include the extracted text inside props as a fallback for the backend
+        props: {
+          ...entry.props,
+          text: entry.text,
+        },
+      };
+    });
+
+    console.log("Sending typed note sync:", {
+      frameId,
+      textShapesCount: payloadShapes.length,
+      payloadShapes,
+    });
+
+    const bounds = {
+      x: updatedFrame.x,
+      y: updatedFrame.y,
+      w: updatedFrame.props?.w ?? 0,
+      h: updatedFrame.props?.h ?? 0,
+    };
+
+    try {
+      const response = await fetch(`${backendUrl}/api/typed-note`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          frameId,
+          roomId: DEFAULT_ROOM_ID,
+          bounds,
+          textShapes: payloadShapes,
+        }),
+      });
+      const result = await response.json();
+      console.log("Typed note sync response:", result);
+    } catch (error) {
+      console.error("Failed to sync typed note", error);
+    }
+  };
+
+  const scheduleTypedNoteSync = (frameId, editor) => {
+    if (!frameId || !editor) return;
+    const timers = typedNoteSyncTimers.current;
+    if (timers[frameId]) {
+      clearTimeout(timers[frameId]);
+    }
+    timers[frameId] = setTimeout(() => {
+      syncTypedNote(frameId, editor);
+    }, 600);
+  };
+
   // Helper function to auto-frame handwriting strokes and capture image
-  const autoFrameHandwriting = async (editor) => {
+  const autoFrameHandwriting = async (editor, seedIds) => {
     if (!editor) return null;
 
     // Get selected shape IDs
-    const selectedIds = editor.getSelectedShapeIds();
+    const selectedIds = seedIds ?? editor.getSelectedShapeIds();
     if (selectedIds.length === 0) return null;
 
     const handwritingIds = collectHandwritingStrokeIds(selectedIds, editor);
@@ -468,13 +756,54 @@ export default function Canvas() {
             label: "Frame Handwriting",
             kbd: "s",
             async onSelect() {
-              // Create frame and group
-              const frameData = await autoFrameHandwriting(editor);
+              if (!editor) return;
+              const selectedIds = editor.getSelectedShapeIds();
+              if (!selectedIds.length) return;
 
-              // If frame was created, capture and upload image
-              if (frameData) {
-                await captureAndUploadFrame(editor, frameData, DEFAULT_ROOM_ID);
+              const textIds = collectTextShapeIds(selectedIds, editor);
+              const handwritingIds = collectHandwritingStrokeIds(
+                selectedIds,
+                editor
+              );
+
+              if (textIds.length && handwritingIds.length === 0) {
+                const existingTypedFrame = selectedIds.find((id) => {
+                  const shape = editor.getShape(id);
+                  return (
+                    shape?.type === "frame" &&
+                    shape.meta?.typedNoteId === shape.id
+                  );
+                });
+                if (existingTypedFrame) {
+                  await syncTypedNote(existingTypedFrame, editor);
+                  return;
+                }
+
+                const typedFrame = await autoFrameTypedText(editor, textIds);
+                if (typedFrame) {
+                  await syncTypedNote(typedFrame.frameId, editor);
+                }
+                return;
               }
+
+              if (handwritingIds.length) {
+                const frameData = await autoFrameHandwriting(
+                  editor,
+                  selectedIds
+                );
+                if (frameData) {
+                  await captureAndUploadFrame(
+                    editor,
+                    frameData,
+                    DEFAULT_ROOM_ID
+                  );
+                }
+                return;
+              }
+
+              console.warn(
+                "Select handwriting strokes or text boxes before pressing S."
+              );
             },
           },
         };
@@ -555,3 +884,84 @@ export default function Canvas() {
     </div>
   );
 }
+  const autoFrameTypedText = async (editor, seedTextIds) => {
+    if (!editor) return null;
+
+    const baseIds = seedTextIds ?? editor.getSelectedShapeIds();
+    if (!baseIds.length) return null;
+
+    const textIds = collectTextShapeIds(baseIds, editor);
+    if (!textIds.length) return null;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    textIds.forEach((id) => {
+      const bounds = editor.getShapePageBounds(id);
+      if (!bounds) return;
+      minX = Math.min(minX, bounds.x);
+      minY = Math.min(minY, bounds.y);
+      maxX = Math.max(maxX, bounds.x + bounds.w);
+      maxY = Math.max(maxY, bounds.y + bounds.h);
+    });
+
+    if (
+      !isFinite(minX) ||
+      !isFinite(minY) ||
+      !isFinite(maxX) ||
+      !isFinite(maxY)
+    ) {
+      console.warn("Unable to calculate typed note bounds for selection");
+      return null;
+    }
+
+    const padding = 24;
+    minX -= padding;
+    minY -= padding;
+    maxX += padding;
+    maxY += padding;
+
+    const frameWidth = maxX - minX;
+    const frameHeight = maxY - minY;
+    const boundsPayload = {
+      x: minX,
+      y: minY,
+      w: frameWidth,
+      h: frameHeight,
+    };
+
+    let frameId = null;
+
+    editor.run(() => {
+      frameId = createShapeId();
+      editor.createShape({
+        id: frameId,
+        type: "frame",
+        x: minX,
+        y: minY,
+        props: {
+          w: frameWidth,
+          h: frameHeight,
+          name: "Typed Note",
+        },
+        meta: {
+          typedNoteId: frameId,
+        },
+      });
+
+      editor.reparentShapes(textIds, frameId);
+      editor.setSelectedShapes([frameId]);
+    });
+
+    if (!frameId) {
+      return null;
+    }
+
+    return {
+      frameId,
+      textIds,
+      bounds: boundsPayload,
+    };
+  };
