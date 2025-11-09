@@ -1,6 +1,6 @@
 [
   {
-    "content": "Implement AI chat as UI overlay instead of custom shapes",
+    "content": "AI chat creating text shapes ON THE CANVAS with streaming responses",
     "status": "completed"
   }
 ]
