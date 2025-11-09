@@ -1,22 +1,19 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { track, useEditor } from 'tldraw';
-import { createTextResponseShape } from '../utils/textShapeManager';
+import React, { useState, useRef, useEffect } from 'react';
+import { createShapeId, useEditor } from 'tldraw';
+
+const backendUrl = process.env.REACT_APP_BACKEND_URL;
 
 const isMac = () => {
   return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 };
 
-export const PromptInput = track(({ focusEventName }) => {
+export default function PromptInput({ focusEventName }) {
   const editor = useEditor();
   const [isFocused, setIsFocused] = useState(false);
   const [prompt, setPrompt] = useState('');
   const showMacKeybinds = isMac();
   const inputRef = useRef(null);
-  
-  // FIXED: Use useMemo to track canvas state properly
-  const isCanvasZeroState = useMemo(() => {
-    return editor.getCurrentPageShapes().length === 0;
-  }, [editor]);
+  const isCanvasEmpty = editor.getCurrentPageShapes().length === 0;
 
   useEffect(() => {
     const handleFocusEvent = () => {
@@ -32,23 +29,87 @@ export const PromptInput = track(({ focusEventName }) => {
     };
   }, [focusEventName]);
 
-  const onInputSubmit = async (promptText) => {
-    if (!promptText.trim()) return; // Prevent empty submissions
+  const createAITextShape = async (promptText) => {
+    if (!promptText.trim()) return;
+
+    const textId = createShapeId();
     
-    setPrompt('');
-    setIsFocused(false);
-    if (inputRef.current) inputRef.current.blur();
+    // Get viewport center
+    const viewport = editor.getViewportPageBounds();
+    const x = viewport.x + (viewport.w / 2) - 300;
+    const y = viewport.y + (viewport.h / 2) - 150;
+    
+    // Create text shape ON THE CANVAS
+    editor.createShape({
+      id: textId,
+      type: 'text',
+      x,
+      y,
+      props: {
+        text: `Q: ${promptText}\n\nAI: ...`,
+        scale: 1.5,
+        autoSize: true,
+      },
+    });
+    
+    // Zoom to the shape
+    editor.zoomToSelection([textId], { duration: 200, inset: 100 });
     
     try {
-      await createTextResponseShape(editor, {
-        searchQuery: promptText.trim(),
-        width: 600,
-        height: 300,
-        centerCamera: true,
-        animationDuration: 200,
+      // Stream AI response
+      const response = await fetch(`${backendUrl}/api/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: promptText }),
       });
+
+      if (!response.ok) throw new Error('API error');
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let aiResponse = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') break;
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                aiResponse += parsed.content;
+                
+                // Update text shape ON THE CANVAS
+                editor.updateShape({
+                  id: textId,
+                  type: 'text',
+                  props: {
+                    text: `Q: ${promptText}\n\nAI: ${aiResponse}`,
+                  },
+                });
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
     } catch (error) {
-      console.error('Failed to create text response shape:', error);
+      console.error('AI request failed:', error);
+      editor.updateShape({
+        id: textId,
+        type: 'text',
+        props: {
+          text: `Q: ${promptText}\n\nAI: Error - Failed to get response`,
+        },
+      });
     }
   };
 
@@ -69,16 +130,21 @@ export const PromptInput = track(({ focusEventName }) => {
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
         minHeight: '60px',
         width: isFocused ? '50%' : '400px',
-        top: isCanvasZeroState ? '50%' : 'auto',
-        bottom: isCanvasZeroState ? 'auto' : '16px',
-        marginTop: isCanvasZeroState ? '-30px' : '0',
+        top: isCanvasEmpty ? '50%' : 'auto',
+        bottom: isCanvasEmpty ? 'auto' : '16px',
+        marginTop: isCanvasEmpty ? '-30px' : '0',
         background: '#FFFFFF',
         color: '#111827',
         zIndex: 1000,
       }}
       onSubmit={(e) => {
         e.preventDefault();
-        onInputSubmit(prompt);
+        if (prompt.trim()) {
+          createAITextShape(prompt);
+          setPrompt('');
+          setIsFocused(false);
+          if (inputRef.current) inputRef.current.blur();
+        }
       }}
     >
       <input
@@ -128,4 +194,4 @@ export const PromptInput = track(({ focusEventName }) => {
       )}
     </form>
   );
-});
+}
