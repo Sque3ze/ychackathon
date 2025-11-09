@@ -284,6 +284,6 @@
 
 - **Design Guidelines:** `/app/design_guidelines.md`
 - **Test Reports:** `/app/test_reports/iteration_1.json`
-- **Preview URL:** https://collab-canvas-25.preview.emergentagent.com
+- **Preview URL:** https://teamcanvas-2.preview.emergentagent.com
 - **tldraw Documentation:** https://tldraw.dev/docs
 - **tldraw v4 API:** https://tldraw.dev/reference/editor
