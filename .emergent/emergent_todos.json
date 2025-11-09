@@ -17,6 +17,6 @@
   },
   {
     "content": "Create comprehensive POC script that combines all functionality: PDF upload, text extraction, chunking, embeddings, and storage",
-    "status": "in_progress"
+    "status": "completed"
   }
 ]
