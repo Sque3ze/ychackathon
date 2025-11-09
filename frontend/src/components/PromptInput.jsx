@@ -31,28 +31,28 @@ export default function PromptInput({ editor, focusEventName }) {
   const createAITextShape = async (promptText) => {
     if (!promptText.trim()) return;
 
-    const textId = createShapeId();
+    const noteId = createShapeId();
     
     // Get viewport center
     const viewport = editor.getViewportPageBounds();
-    const x = viewport.x + (viewport.w / 2) - 300;
+    const x = viewport.x + (viewport.w / 2) - 200;
     const y = viewport.y + (viewport.h / 2) - 150;
     
-    // Create text shape ON THE CANVAS
+    // Create NOTE shape ON THE CANVAS (sticky notes support text)
     editor.createShape({
-      id: textId,
-      type: 'text',
+      id: noteId,
+      type: 'note',
       x,
       y,
       props: {
-        text: `Q: ${promptText}\n\nAI: ...`,
-        scale: 1.5,
-        autoSize: true,
+        color: 'light-blue',
+        size: 'l',
+        text: `Q: ${promptText}\n\nAI: Thinking...`,
       },
     });
     
     // Zoom to the shape
-    editor.zoomToSelection([textId], { duration: 200, inset: 100 });
+    editor.zoomToSelection([noteId], { duration: 200, inset: 100 });
     
     try {
       // Stream AI response
@@ -85,10 +85,10 @@ export default function PromptInput({ editor, focusEventName }) {
               if (parsed.content) {
                 aiResponse += parsed.content;
                 
-                // Update text shape ON THE CANVAS
+                // Update NOTE shape ON THE CANVAS with streaming text
                 editor.updateShape({
-                  id: textId,
-                  type: 'text',
+                  id: noteId,
+                  type: 'note',
                   props: {
                     text: `Q: ${promptText}\n\nAI: ${aiResponse}`,
                   },
@@ -103,10 +103,11 @@ export default function PromptInput({ editor, focusEventName }) {
     } catch (error) {
       console.error('AI request failed:', error);
       editor.updateShape({
-        id: textId,
-        type: 'text',
+        id: noteId,
+        type: 'note',
         props: {
-          text: `Q: ${promptText}\n\nAI: Error - Failed to get response`,
+          text: `Q: ${promptText}\n\nAI: Error - ${error.message}`,
+          color: 'light-red',
         },
       });
     }
