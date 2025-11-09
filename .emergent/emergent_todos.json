@@ -1,22 +1,38 @@
 [
   {
-    "content": "Web search: Supabase pgvector best practices + OpenAI embeddings + pdfplumber tips",
-    "status": "completed"
+    "content": "Refactor POC classes into reusable backend modules (pdf_processor.py)",
+    "status": "pending"
   },
   {
-    "content": "Call integration playbook agent for OpenAI embeddings integration",
-    "status": "completed"
+    "content": "Add POST /api/pdf/upload endpoint with file validation and processing",
+    "status": "pending"
   },
   {
-    "content": "Set up Supabase resources: bucket 'pdfs' + tables (pdf_documents, pdf_chunks) + pgvector extension",
-    "status": "completed"
+    "content": "Add GET /api/pdf/{document_id} endpoint for document retrieval",
+    "status": "pending"
   },
   {
-    "content": "Install backend dependencies: pdfplumber, supabase-py, openai",
-    "status": "completed"
+    "content": "Add POST /api/pdf/search endpoint for semantic search",
+    "status": "pending"
   },
   {
-    "content": "Create comprehensive POC script that combines all functionality: PDF upload, text extraction, chunking, embeddings, and storage",
-    "status": "completed"
+    "content": "Install frontend dependencies: react-pdf, pdfjs-dist, framer-motion",
+    "status": "pending"
+  },
+  {
+    "content": "Add Sonner Toaster to App.js root component",
+    "status": "pending"
+  },
+  {
+    "content": "Create PdfUploadButton component with Dialog and file input",
+    "status": "pending"
+  },
+  {
+    "content": "Integrate PdfUploadButton with Canvas toolbar",
+    "status": "pending"
+  },
+  {
+    "content": "Test end-to-end upload flow and fix any issues",
+    "status": "pending"
   }
 ]
