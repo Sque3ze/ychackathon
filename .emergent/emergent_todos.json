@@ -1,38 +1,26 @@
 [
   {
-    "content": "Refactor POC classes into reusable backend modules (pdf_processor.py)",
-    "status": "completed"
+    "content": "Configure PDF.js worker for react-pdf",
+    "status": "pending"
   },
   {
-    "content": "Add POST /api/pdf/upload endpoint with file validation and processing",
-    "status": "completed"
+    "content": "Create PdfViewer component with Document and Page from react-pdf",
+    "status": "pending"
   },
   {
-    "content": "Add GET /api/pdf/{document_id} endpoint for document retrieval",
-    "status": "completed"
+    "content": "Add zoom controls and page navigation to PdfViewer",
+    "status": "pending"
   },
   {
-    "content": "Add POST /api/pdf/search endpoint for semantic search",
-    "status": "completed"
+    "content": "Render uploaded PDFs on canvas as overlay elements",
+    "status": "pending"
   },
   {
-    "content": "Install frontend dependencies: react-pdf, pdfjs-dist, framer-motion",
-    "status": "completed"
+    "content": "Add drag and close functionality for PDF viewers",
+    "status": "pending"
   },
   {
-    "content": "Add Sonner Toaster to App.js root component",
-    "status": "completed"
-  },
-  {
-    "content": "Create PdfUploadButton component with Dialog and file input",
-    "status": "completed"
-  },
-  {
-    "content": "Integrate PdfUploadButton with Canvas toolbar",
-    "status": "completed"
-  },
-  {
-    "content": "Test end-to-end upload flow and fix any issues",
-    "status": "completed"
+    "content": "Test PDF rendering with uploaded documents",
+    "status": "pending"
   }
 ]
