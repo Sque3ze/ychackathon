@@ -9,11 +9,11 @@
   },
   {
     "content": "Set up Supabase resources: bucket 'pdfs' + tables (pdf_documents, pdf_chunks) + pgvector extension",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Install backend dependencies: pdfplumber, supabase-py, openai",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Create POC script: PDF upload to Supabase Storage",
