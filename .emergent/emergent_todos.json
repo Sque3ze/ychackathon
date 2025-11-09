@@ -5,11 +5,11 @@
   },
   {
     "content": "Call integration playbook agent for OpenAI embeddings integration",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Set up Supabase resources: bucket 'pdfs' + tables (pdf_documents, pdf_chunks) + pgvector extension",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Install backend dependencies: pdfplumber, supabase-py, openai",
