@@ -752,7 +752,15 @@ class SupabaseRAGStorage:
         threshold: float = 0.2,
     ) -> List[Dict]:
         if not frame_ids:
+            self.logger.debug("search_typed_context: No frame_ids provided")
             return []
+
+        self.logger.info(
+            "search_typed_context: Searching for frame_ids=%s, threshold=%.2f, limit_per_note=%d",
+            frame_ids,
+            threshold,
+            limit_per_note,
+        )
 
         try:
             notes_resp = (
@@ -760,6 +768,11 @@ class SupabaseRAGStorage:
                 .select("id,frame_id")
                 .in_("frame_id", frame_ids)
                 .execute()
+            )
+            self.logger.info(
+                "Found %d typed notes for frame_ids %s",
+                len(notes_resp.data or []),
+                frame_ids,
             )
         except Exception as e:
             self.logger.error("Failed to fetch typed notes for search: %s", e, exc_info=True)
@@ -777,11 +790,23 @@ class SupabaseRAGStorage:
                         "filter_note_id": note["id"],
                     },
                 ).execute()
+                self.logger.info(
+                    "RPC match_typed_note_chunks for note %s returned %d matches",
+                    note["id"],
+                    len(resp.data or []),
+                )
             except Exception as e:
                 self.logger.error("Typed note match RPC failed: %s", e, exc_info=True)
                 continue
 
             for row in resp.data or []:
+                similarity = row.get("similarity", 0)
+                self.logger.debug(
+                    "Match: similarity=%.3f, chunk_id=%s, text_preview=%.50s",
+                    similarity,
+                    row.get("id"),
+                    row.get("chunk_text", "")[:50],
+                )
                 matches.append(
                     {
                         "source_type": "typed",
@@ -793,6 +818,8 @@ class SupabaseRAGStorage:
                         "similarity": row.get("similarity"),
                     }
                 )
+        
+        self.logger.info("search_typed_context: Returning %d total matches", len(matches))
         return matches
 
 

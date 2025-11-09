@@ -293,6 +293,27 @@ export default function Canvas() {
     return Array.from(strokes);
   };
 
+  // Helper function to extract plain text from tldraw's richText structure (ProseMirror format)
+  const extractTextFromRichText = (richText) => {
+    if (!richText || typeof richText !== "object") {
+      return "";
+    }
+    
+    // If it's a text node, return the text directly
+    if (richText.type === "text" && richText.text) {
+      return richText.text;
+    }
+    
+    // If it has content array, recursively extract text from all children
+    if (Array.isArray(richText.content)) {
+      return richText.content
+        .map((node) => extractTextFromRichText(node))
+        .join("");
+    }
+    
+    return "";
+  };
+
   const gatherTextShapesUnderFrame = (editor, frameId) => {
     const results = [];
     const stack = editor.getSortedChildIdsForParent
@@ -306,14 +327,45 @@ export default function Canvas() {
 
       if (shape.type === "text") {
         const bounds = editor.getShapePageBounds(shape.id);
+        
+        // Extract text from tldraw text shapes
+        // tldraw stores text in richText structure (ProseMirror format)
+        let textContent = "";
+        
+        // Method 1: Extract from richText structure (most common in newer tldraw)
+        if (shape.props?.richText) {
+          textContent = extractTextFromRichText(shape.props.richText);
+        }
+        
+        // Method 2: Direct props.text (fallback for older format)
+        if (!textContent && shape.props?.text) {
+          textContent = typeof shape.props.text === "string" 
+            ? shape.props.text 
+            : String(shape.props.text);
+        }
+        
+        // Method 3: Try using editor API if available
+        if (!textContent && editor.getShapeUtil) {
+          try {
+            const util = editor.getShapeUtil(shape.type);
+            if (util && typeof util.getTextContent === "function") {
+              textContent = util.getTextContent(shape) || "";
+            }
+          } catch (e) {
+            // Ignore errors
+          }
+        }
+        
         results.push({
           id: shape.id,
-          text: shape.props?.text || "",
+          text: textContent,
           props: {
             font: shape.props?.font,
             size: shape.props?.size,
             color: shape.props?.color,
             align: shape.props?.align,
+            // Include all props for debugging
+            ...shape.props,
           },
           bounds,
         });
@@ -415,12 +467,32 @@ export default function Canvas() {
       return;
     }
 
-    const payloadShapes = textShapes.map((entry) => ({
-      shapeId: entry.id,
-      text: entry.text,
-      order: entry.order,
-      props: entry.props,
-    }));
+    const payloadShapes = textShapes.map((entry) => {
+      // Debug: log what we're extracting
+      console.log("Text shape entry:", {
+        id: entry.id,
+        text: entry.text,
+        props: entry.props,
+        fullEntry: entry,
+      });
+      
+      return {
+        shapeId: entry.id,
+        text: entry.text,
+        order: entry.order,
+        // Include the extracted text inside props as a fallback for the backend
+        props: {
+          ...entry.props,
+          text: entry.text,
+        },
+      };
+    });
+
+    console.log("Sending typed note sync:", {
+      frameId,
+      textShapesCount: payloadShapes.length,
+      payloadShapes,
+    });
 
     const bounds = {
       x: updatedFrame.x,
@@ -430,7 +502,7 @@ export default function Canvas() {
     };
 
     try {
-      await fetch(`${backendUrl}/api/typed-note`, {
+      const response = await fetch(`${backendUrl}/api/typed-note`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -440,6 +512,8 @@ export default function Canvas() {
           textShapes: payloadShapes,
         }),
       });
+      const result = await response.json();
+      console.log("Typed note sync response:", result);
     } catch (error) {
       console.error("Failed to sync typed note", error);
     }
