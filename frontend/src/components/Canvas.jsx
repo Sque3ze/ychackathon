@@ -10,7 +10,7 @@ import {
   DefaultToolbar,
   TldrawUiMenuItem,
   useEditor,
-  TLComponents,
+  defaultShapeUtils,
 } from "tldraw";
 import { useSyncDemo } from "@tldraw/sync";
 import { createShapeId } from "@tldraw/editor";
@@ -44,7 +44,7 @@ function CustomUI() {
   );
 }
 
-const components: TLComponents = {
+const components = {
   Toolbar: () => {
     return (
       <div
@@ -62,7 +62,7 @@ const components: TLComponents = {
   InFrontOfTheCanvas: CustomUI,
 };
 
-// Custom shape utilities
+// Custom shape utilities only (useSyncDemo will merge with defaults internally)
 const customShapeUtils = [
   PdfShapeUtil,
   VideoCallShapeUtil,
@@ -70,6 +70,9 @@ const customShapeUtils = [
   EmbedShapeUtil,
   MeetingSummaryShapeUtil,
 ];
+
+// All shape utils for Tldraw component (defaults + custom)
+const allShapeUtils = [...defaultShapeUtils, ...customShapeUtils];
 
 const collectTextShapeIds = (seedIds, editor) => {
   const visited = new Set();
@@ -151,6 +154,7 @@ export default function Canvas() {
   const typedNoteSyncTimers = useRef({});
 
   // Use tldraw's built-in demo sync with custom shapes
+  // Pass only custom shapes - useSyncDemo should handle defaults
   const store = useSyncDemo({
     roomId: DEFAULT_ROOM_ID,
     shapeUtils: customShapeUtils,
@@ -1040,6 +1044,7 @@ export default function Canvas() {
       {/* tldraw canvas */}
       <Tldraw
         store={store}
+        shapeUtils={allShapeUtils}
         components={components}
         onMount={handleMount}
         overrides={overrides}

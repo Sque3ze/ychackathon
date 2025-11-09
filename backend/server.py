@@ -24,6 +24,9 @@ import logging
 import asyncio
 from dotenv import load_dotenv
 
+# Load environment variables FIRST before importing tools that need them
+load_dotenv()
+
 from pdf_processor import (
     PDFProcessor,
     EmbeddingGenerator,
@@ -33,9 +36,6 @@ from pdf_processor import (
 from system_prompt import SYSTEM_PROMPT
 from image_search_tool import get_image_search_tool
 from embed_tool import get_embed_tool
-
-# Load environment variables
-load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
