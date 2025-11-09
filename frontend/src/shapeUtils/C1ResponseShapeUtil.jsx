@@ -14,84 +14,52 @@ const C1ResponseComponent = memo(({ shape, editor }) => {
   const isDarkMode = editor.user.getIsDarkMode();
   const themeMode = isDarkMode === true ? "dark" : "light";
 
-  // Auto-resize based on content height
+  // Auto-resize as content grows, only expanding height to avoid jitter
   useLayoutEffect(() => {
     if (!contentRef.current || !hasContent) return;
 
     let rafId = null;
-    let timeoutId = null;
-    let isUpdating = false;
+    let lastUpdate = 0;
 
-    const updateShapeHeight = () => {
-      if (!contentRef.current || isUpdating) return;
-
-      // Use requestAnimationFrame to batch updates and prevent ResizeObserver loops
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-      }
-
+    const scheduleHeightUpdate = (force = false) => {
+      if (rafId) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         if (!contentRef.current) return;
 
-        const newHeight = Math.max(200, contentRef.current.scrollHeight + 40);
+        const measuredHeight = Math.max(
+          240,
+          contentRef.current.scrollHeight + 48
+        );
 
-        // Only update if height changed significantly
-        if (Math.abs(newHeight - shape.props.h) > 10) {
-          isUpdating = true;
+        const heightDelta = measuredHeight - shape.props.h;
+        const now = Date.now();
 
-          // Use setTimeout to defer the update and break the ResizeObserver loop
-          timeoutId = setTimeout(() => {
-            try {
-              editor.updateShape({
-                id: shape.id,
-                type: shape.type,
-                props: {
-                  ...shape.props,
-                  h: newHeight,
-                },
-              });
-            } catch (error) {
-              // Silently ignore ResizeObserver errors
-              if (!error?.message?.includes("ResizeObserver")) {
-                console.error("Error updating shape height:", error);
-              }
-            } finally {
-              isUpdating = false;
-            }
-          }, 0);
+        if (!force) {
+          if (heightDelta < 12) return; // Only expand when noticeably larger
+          if (now - lastUpdate < 120) return; // Throttle updates
         }
+
+        lastUpdate = now;
+        editor.updateShape({
+          id: shape.id,
+          type: shape.type,
+          props: {
+            ...shape.props,
+            h: measuredHeight,
+          },
+        });
       });
     };
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      // Wrap in try-catch to prevent ResizeObserver errors from bubbling
-      try {
-        updateShapeHeight();
-      } catch (error) {
-        // Silently ignore ResizeObserver loop errors
-        if (!error?.message?.includes("ResizeObserver")) {
-          console.error("ResizeObserver error:", error);
-        }
-      }
-    });
-
+    const resizeObserver = new ResizeObserver(() => scheduleHeightUpdate());
     resizeObserver.observe(contentRef.current);
-
-    // Initial update with delay to avoid immediate ResizeObserver trigger
-    timeoutId = setTimeout(() => {
-      updateShapeHeight();
-    }, 100);
+    scheduleHeightUpdate(true);
 
     return () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-      }
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (rafId) cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
     };
-  }, [editor, shape.id, shape.type, shape.props.h, hasContent]);
+  }, [editor, hasContent, shape.id, shape.props, shape.type]);
 
   if (!hasContent) {
     return (
@@ -138,6 +106,7 @@ const C1ResponseComponent = memo(({ shape, editor }) => {
         gap: "12px",
         overflow: "visible",
         pointerEvents: "all",
+        minHeight: shape.props.h,
       }}
     >
       <div ref={contentRef} style={{ width: "100%" }}>
