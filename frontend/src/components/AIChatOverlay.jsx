@@ -97,7 +97,7 @@ export default function AIChatOverlay({ editor }) {
                 if (now - lastUpdate > 100) {
                   editor.updateShape({
                     id: noteId,
-                    type: 'note',
+                    type: 'geo',
                     props: {
                       text: `Q: ${promptText}\n\nA: ${aiResponse}`,
                     },
@@ -115,7 +115,7 @@ export default function AIChatOverlay({ editor }) {
       // Final update
       editor.updateShape({
         id: noteId,
-        type: 'note',
+        type: 'geo',
         props: {
           text: `Q: ${promptText}\n\nA: ${aiResponse}`,
         },
@@ -125,7 +125,7 @@ export default function AIChatOverlay({ editor }) {
       console.error('AI request failed:', error);
       editor.updateShape({
         id: noteId,
-        type: 'note',
+        type: 'geo',
         props: {
           text: `Q: ${promptText}\n\nError: Failed to get AI response`,
           color: 'light-red',
