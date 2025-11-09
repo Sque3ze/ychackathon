@@ -1,23 +1,23 @@
 [
   {
     "content": "Refactor POC classes into reusable backend modules (pdf_processor.py)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add POST /api/pdf/upload endpoint with file validation and processing",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add GET /api/pdf/{document_id} endpoint for document retrieval",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add POST /api/pdf/search endpoint for semantic search",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Install frontend dependencies: react-pdf, pdfjs-dist, framer-motion",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Add Sonner Toaster to App.js root component",
