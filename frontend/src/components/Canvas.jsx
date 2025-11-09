@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   Tldraw,
   DefaultToolbar,
@@ -14,6 +20,7 @@ import C1PlusButton from "./C1PlusButton";
 import { PdfShapeUtil } from "../shapeUtils/PdfShapeUtil";
 import { VideoCallShapeUtil } from "../shapeUtils/VideoCallShapeUtil";
 import { C1ResponseShapeUtil } from "../shapeUtils/C1ResponseShapeUtil";
+import { EmbedShapeUtil } from "../shapeUtils/EmbedShapeUtil";
 import axios from "axios";
 import "tldraw/tldraw.css";
 
@@ -52,6 +59,7 @@ const customShapeUtils = [
   PdfShapeUtil,
   VideoCallShapeUtil,
   C1ResponseShapeUtil,
+  EmbedShapeUtil,
 ];
 
 const collectTextShapeIds = (seedIds, editor) => {
@@ -463,7 +471,9 @@ export default function Canvas() {
 
     const backendUrl = process.env.REACT_APP_BACKEND_URL || "";
     if (!backendUrl) {
-      console.warn("REACT_APP_BACKEND_URL is not set; skipping typed note sync.");
+      console.warn(
+        "REACT_APP_BACKEND_URL is not set; skipping typed note sync."
+      );
       return;
     }
 
@@ -876,89 +886,88 @@ export default function Canvas() {
         components={components}
         onMount={handleMount}
         overrides={overrides}
-        shapeUtils={customShapeUtils}
       />
     </div>
   );
 }
-  const autoFrameTypedText = async (editor, seedTextIds) => {
-    if (!editor) return null;
+const autoFrameTypedText = async (editor, seedTextIds) => {
+  if (!editor) return null;
 
-    const baseIds = seedTextIds ?? editor.getSelectedShapeIds();
-    if (!baseIds.length) return null;
+  const baseIds = seedTextIds ?? editor.getSelectedShapeIds();
+  if (!baseIds.length) return null;
 
-    const textIds = collectTextShapeIds(baseIds, editor);
-    if (!textIds.length) return null;
+  const textIds = collectTextShapeIds(baseIds, editor);
+  if (!textIds.length) return null;
 
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
 
-    textIds.forEach((id) => {
-      const bounds = editor.getShapePageBounds(id);
-      if (!bounds) return;
-      minX = Math.min(minX, bounds.x);
-      minY = Math.min(minY, bounds.y);
-      maxX = Math.max(maxX, bounds.x + bounds.w);
-      maxY = Math.max(maxY, bounds.y + bounds.h);
-    });
+  textIds.forEach((id) => {
+    const bounds = editor.getShapePageBounds(id);
+    if (!bounds) return;
+    minX = Math.min(minX, bounds.x);
+    minY = Math.min(minY, bounds.y);
+    maxX = Math.max(maxX, bounds.x + bounds.w);
+    maxY = Math.max(maxY, bounds.y + bounds.h);
+  });
 
-    if (
-      !isFinite(minX) ||
-      !isFinite(minY) ||
-      !isFinite(maxX) ||
-      !isFinite(maxY)
-    ) {
-      console.warn("Unable to calculate typed note bounds for selection");
-      return null;
-    }
+  if (
+    !isFinite(minX) ||
+    !isFinite(minY) ||
+    !isFinite(maxX) ||
+    !isFinite(maxY)
+  ) {
+    console.warn("Unable to calculate typed note bounds for selection");
+    return null;
+  }
 
-    const padding = 24;
-    minX -= padding;
-    minY -= padding;
-    maxX += padding;
-    maxY += padding;
+  const padding = 24;
+  minX -= padding;
+  minY -= padding;
+  maxX += padding;
+  maxY += padding;
 
-    const frameWidth = maxX - minX;
-    const frameHeight = maxY - minY;
-    const boundsPayload = {
+  const frameWidth = maxX - minX;
+  const frameHeight = maxY - minY;
+  const boundsPayload = {
+    x: minX,
+    y: minY,
+    w: frameWidth,
+    h: frameHeight,
+  };
+
+  let frameId = null;
+
+  editor.run(() => {
+    frameId = createShapeId();
+    editor.createShape({
+      id: frameId,
+      type: "frame",
       x: minX,
       y: minY,
-      w: frameWidth,
-      h: frameHeight,
-    };
-
-    let frameId = null;
-
-    editor.run(() => {
-      frameId = createShapeId();
-      editor.createShape({
-        id: frameId,
-        type: "frame",
-        x: minX,
-        y: minY,
-        props: {
-          w: frameWidth,
-          h: frameHeight,
-          name: "Typed Note",
-        },
-        meta: {
-          typedNoteId: frameId,
-        },
-      });
-
-      editor.reparentShapes(textIds, frameId);
-      editor.setSelectedShapes([frameId]);
+      props: {
+        w: frameWidth,
+        h: frameHeight,
+        name: "Typed Note",
+      },
+      meta: {
+        typedNoteId: frameId,
+      },
     });
 
-    if (!frameId) {
-      return null;
-    }
+    editor.reparentShapes(textIds, frameId);
+    editor.setSelectedShapes([frameId]);
+  });
 
-    return {
-      frameId,
-      textIds,
-      bounds: boundsPayload,
-    };
+  if (!frameId) {
+    return null;
+  }
+
+  return {
+    frameId,
+    textIds,
+    bounds: boundsPayload,
   };
+};
