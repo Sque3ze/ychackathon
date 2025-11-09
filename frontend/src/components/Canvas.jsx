@@ -16,6 +16,26 @@ export default function Canvas() {
   // Handle editor mount
   const handleMount = (editor) => {
     editorRef.current = editor;
+    
+    // Add listener to prevent resizing of groups with noResize meta flag
+    editor.sideEffects.registerBeforeChangeHandler('shape', (prev, next) => {
+      // Check if this is a group with noResize flag
+      if (next.type === 'group' && next.meta?.noResize) {
+        // If size changed, revert to previous size
+        // Groups don't have w/h props directly, so we check if any child transformations happened
+        // For groups, we just prevent the resize by returning the previous state
+        // But allow position changes
+        if (prev && (prev.x !== next.x || prev.y !== next.y)) {
+          // Allow movement
+          return next;
+        }
+        // For any other changes, keep the previous state to prevent resize
+        if (prev && prev.rotation === next.rotation) {
+          return { ...next, x: prev.x || next.x, y: prev.y || next.y };
+        }
+      }
+      return next;
+    });
   };
 
   // Helper function to auto-frame handwriting strokes
