@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import pdfplumber
 from openai import OpenAI
 from supabase import create_client, Client
-from emergentintegrations.llm.utils import get_integration_proxy_url
+# from emergentintegrations.llm.utils import get_integration_proxy_url
 import logging
 
 logger = logging.getLogger(__name__)
@@ -180,10 +180,9 @@ class SupabaseRAGStorage:
                 "filename": filename,
                 "storage_path": storage_path,
                 "page_count": page_count,
-                "file_size": file_size,
-                "created_at": datetime.now(timezone.utc).isoformat()
+                "file_size": file_size
             }
-            
+
             response = self.client.table("pdf_documents").insert(data).execute()
             doc_id = response.data[0]["id"]
             
