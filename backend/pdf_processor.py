@@ -90,20 +90,18 @@ class TextChunker:
 
 
 class EmbeddingGenerator:
-    """Generate embeddings using OpenAI API"""
+    """Generate embeddings using litellm (supports Emergent universal key)"""
     
     def __init__(self, api_key: str, model: str = "text-embedding-3-small", base_url: str = None):
         self.model = model
-        # Configure client with Emergent gateway if using Emergent universal key
-        if base_url:
-            self.client = OpenAI(api_key=api_key, base_url=base_url)
-        else:
-            self.client = OpenAI(api_key=api_key)
+        self.api_key = api_key
         self.logger = logging.getLogger(__name__ + '.EmbeddingGenerator')
+        # Set API key for litellm
+        os.environ["OPENAI_API_KEY"] = api_key
     
     def generate_embeddings(self, texts: List[str], batch_size: int = 100) -> List[List[float]]:
         """
-        Generate embeddings for a list of texts in batches.
+        Generate embeddings for a list of texts in batches using litellm.
         Returns: List of embedding vectors
         """
         all_embeddings = []
@@ -113,15 +111,17 @@ class EmbeddingGenerator:
             self.logger.info(f"Generating embeddings for batch {i//batch_size + 1} ({len(batch)} texts)")
             
             try:
-                response = self.client.embeddings.create(
+                # Use litellm which works with Emergent universal key
+                response = embedding(
+                    model=self.model,
                     input=batch,
-                    model=self.model
+                    api_key=self.api_key
                 )
                 
-                batch_embeddings = [item.embedding for item in sorted(response.data, key=lambda x: x.index)]
+                batch_embeddings = [item['embedding'] for item in response.data]
                 all_embeddings.extend(batch_embeddings)
                 
-                self.logger.info(f"Generated {len(batch_embeddings)} embeddings, tokens used: {response.usage.total_tokens}")
+                self.logger.info(f"Generated {len(batch_embeddings)} embeddings")
                 
             except Exception as e:
                 self.logger.error(f"Error generating embeddings: {e}")
