@@ -220,7 +220,34 @@ export default function PromptInput({ focusEventName }) {
         ];
 
         // Find first position that doesn't overlap
-        const validPosition = positions.find((pos) => !checkOverlap(pos.x, pos.y));
+        let validPosition = positions.find((pos) => !checkOverlap(pos.x, pos.y));
+
+        // If all immediate positions overlap, try positions with increased distance
+        if (!validPosition) {
+          const extendedPositions = [
+            {
+              // Right with 2x padding
+              x: shapePageBounds.maxX + padding * 2,
+              y: shapePageBounds.center.y - newShapeHeight / 2,
+            },
+            {
+              // Below with 2x padding
+              x: shapePageBounds.center.x - newShapeWidth / 2,
+              y: shapePageBounds.maxY + padding * 2,
+            },
+            {
+              // Right with 3x padding
+              x: shapePageBounds.maxX + padding * 3,
+              y: shapePageBounds.center.y - newShapeHeight / 2,
+            },
+            {
+              // Below with 3x padding
+              x: shapePageBounds.center.x - newShapeWidth / 2,
+              y: shapePageBounds.maxY + padding * 3,
+            },
+          ];
+          validPosition = extendedPositions.find((pos) => !checkOverlap(pos.x, pos.y));
+        }
 
         if (validPosition) {
           // Use the first valid position relative to selected shape
