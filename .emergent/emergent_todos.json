@@ -1,6 +1,38 @@
 [
   {
-    "content": "Fix persistence bug identified by testing agent - update to tldraw v4 API",
-    "status": "completed"
+    "content": "Web search: Supabase pgvector best practices + OpenAI embeddings + pdfplumber tips",
+    "status": "pending"
+  },
+  {
+    "content": "Call integration playbook agent for OpenAI embeddings integration",
+    "status": "pending"
+  },
+  {
+    "content": "Set up Supabase resources: bucket 'pdfs' + tables (pdf_documents, pdf_chunks) + pgvector extension",
+    "status": "pending"
+  },
+  {
+    "content": "Install backend dependencies: pdfplumber, supabase-py, openai",
+    "status": "pending"
+  },
+  {
+    "content": "Create POC script: PDF upload to Supabase Storage",
+    "status": "pending"
+  },
+  {
+    "content": "Create POC script: PDF text extraction with pdfplumber",
+    "status": "pending"
+  },
+  {
+    "content": "Create POC script: Text chunking with page metadata",
+    "status": "pending"
+  },
+  {
+    "content": "Create POC script: Generate embeddings via OpenAI + store in Supabase",
+    "status": "pending"
+  },
+  {
+    "content": "Validate POC: Test similarity search query on stored vectors",
+    "status": "pending"
   }
 ]
