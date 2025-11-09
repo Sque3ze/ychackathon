@@ -2,5 +2,29 @@
   {
     "content": "AI chat creating text shapes ON THE CANVAS with streaming responses",
     "status": "completed"
+  },
+  {
+    "content": "Configure PDF.js worker for react-pdf",
+    "status": "completed"
+  },
+  {
+    "content": "Create PdfViewer component with Document and Page from react-pdf",
+    "status": "completed"
+  },
+  {
+    "content": "Add zoom controls and page navigation to PdfViewer",
+    "status": "completed"
+  },
+  {
+    "content": "Render uploaded PDFs on canvas as overlay elements",
+    "status": "completed"
+  },
+  {
+    "content": "Add drag and close functionality for PDF viewers",
+    "status": "completed"
+  },
+  {
+    "content": "Test PDF rendering with uploaded documents",
+    "status": "completed"
   }
 ]
