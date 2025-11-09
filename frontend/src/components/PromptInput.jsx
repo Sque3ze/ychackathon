@@ -12,6 +12,7 @@ export default function PromptInput({ focusEventName }) {
   const editor = useEditor();
   const [isFocused, setIsFocused] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [selectedSourcesCount, setSelectedSourcesCount] = useState(0);
   const showMacKeybinds = isMac();
   const inputRef = useRef(null);
 
@@ -95,20 +96,6 @@ export default function PromptInput({ focusEventName }) {
     [createArrowBinding, editor, getBoundsCenter]
   );
 
-  useEffect(() => {
-    const handleFocusEvent = () => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        setIsFocused(true);
-      }
-    };
-
-    window.addEventListener(focusEventName, handleFocusEvent);
-    return () => {
-      window.removeEventListener(focusEventName, handleFocusEvent);
-    };
-  }, [focusEventName]);
-
   const resolveSelectionForContext = useCallback(() => {
     const selectedIds = editor.getSelectedShapeIds();
     if (!selectedIds.length) return [];
@@ -139,6 +126,41 @@ export default function PromptInput({ focusEventName }) {
 
     return Array.from(resolved);
   }, [editor]);
+
+  useEffect(() => {
+    const handleFocusEvent = () => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        setIsFocused(true);
+      }
+    };
+
+    window.addEventListener(focusEventName, handleFocusEvent);
+    return () => {
+      window.removeEventListener(focusEventName, handleFocusEvent);
+    };
+  }, [focusEventName]);
+
+  // Track selection changes to update source count
+  useEffect(() => {
+    const updateSourceCount = () => {
+      const resolved = resolveSelectionForContext();
+      console.log('Selected sources count:', resolved.length, resolved);
+      setSelectedSourcesCount(resolved.length);
+    };
+
+    // Update immediately
+    updateSourceCount();
+
+    // Listen to selection changes - use interval as fallback
+    const interval = setInterval(() => {
+      updateSourceCount();
+    }, 500);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [editor, resolveSelectionForContext]);
 
   const createAITextShape = async (promptText) => {
     if (!promptText.trim()) return;
@@ -271,28 +293,65 @@ export default function PromptInput({ focusEventName }) {
   };
 
   return (
-    <form
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        position: 'fixed',
-        left: '50%',
-        bottom: '16px',
-        transform: 'translateX(-50%)',
-        padding: '12px 20px',
-        borderRadius: '16px',
-        border: '1px solid #E5E7EB',
-        fontSize: '16px',
-        transition: 'all 0.3s ease-in-out',
-        gap: '8px',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-        minHeight: '60px',
-        width: isFocused ? '50%' : '400px',
-        background: '#FFFFFF',
-        color: '#111827',
-        zIndex: 10000,
-        pointerEvents: 'all',
-      }}
+    <>
+      {/* Source count indicator - eyebrow style */}
+      <div
+        style={{
+          position: 'fixed',
+          left: '50%',
+          bottom: selectedSourcesCount > 0 ? '76px' : '68px',
+          transform: 'translateX(-50%)',
+          width: isFocused ? '50%' : '400px',
+          padding: '6px 20px',
+          borderRadius: '12px 12px 0 0',
+          background: 'rgba(249, 250, 251, 0.98)',
+          borderTop: '1px solid #E5E7EB',
+          borderLeft: '1px solid #E5E7EB',
+          borderRight: '1px solid #E5E7EB',
+          color: '#6B7280',
+          fontSize: '11px',
+          fontWeight: '600',
+          zIndex: 9999,
+          pointerEvents: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          opacity: selectedSourcesCount > 0 ? 1 : 0,
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          backdropFilter: 'blur(8px)',
+          letterSpacing: '0.025em',
+        }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+        {selectedSourcesCount} SOURCE{selectedSourcesCount !== 1 ? 'S' : ''}
+      </div>
+
+      <form
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          position: 'fixed',
+          left: '50%',
+          bottom: '16px',
+          transform: 'translateX(-50%)',
+          padding: '12px 20px',
+          borderRadius: selectedSourcesCount > 0 ? '0 0 16px 16px' : '16px',
+          border: '1px solid #E5E7EB',
+          borderTop: selectedSourcesCount > 0 ? 'none' : '1px solid #E5E7EB',
+          fontSize: '16px',
+          transition: 'all 0.3s ease-in-out',
+          gap: '8px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          minHeight: '60px',
+          width: isFocused ? '50%' : '400px',
+          background: '#FFFFFF',
+          color: '#111827',
+          zIndex: 10000,
+          pointerEvents: 'all',
+        }}
       onClick={(e) => {
         e.stopPropagation();
         if (inputRef.current && !isFocused) {
@@ -354,6 +413,7 @@ export default function PromptInput({ focusEventName }) {
           {showMacKeybinds ? '⌘ + K' : 'Ctrl + K'}
         </span>
       )}
-    </form>
+      </form>
+    </>
   );
 }
