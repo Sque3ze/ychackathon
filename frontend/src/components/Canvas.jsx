@@ -90,12 +90,10 @@ export default function Canvas() {
       editor.reparentShapes(handwritingIds, frameId);
 
       // Group the frame and all strokes
-      const groupId = editor.groupShapes([frameId, ...handwritingIds]);
+      editor.groupShapes([frameId, ...handwritingIds]);
 
-      // Select the new group
-      if (groupId) {
-        editor.select(groupId);
-      }
+      // Select the frame (which now contains all the grouped strokes)
+      editor.select(frameId);
     });
   };
 
