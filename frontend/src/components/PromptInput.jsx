@@ -31,30 +31,27 @@ export default function PromptInput({ editor, focusEventName }) {
   const createAITextShape = async (promptText) => {
     if (!promptText.trim()) return;
 
-    const geoId = createShapeId();
+    const textId = createShapeId();
     
     // Get viewport center
     const viewport = editor.getViewportPageBounds();
     const x = viewport.x + (viewport.w / 2) - 300;
     const y = viewport.y + (viewport.h / 2) - 150;
     
-    // Create GEO shape (rectangle) ON THE CANVAS - these support text!
+    // Create TEXT shape ON THE CANVAS using richText!
     editor.createShape({
-      id: geoId,
-      type: 'geo',
+      id: textId,
+      type: 'text',
       x,
       y,
       props: {
-        geo: 'rectangle',
-        w: 600,
-        h: 300,
-        color: 'light-blue',
-        fill: 'semi',
+        richText: toRichText(`Q: ${promptText}\n\nAI: Thinking...`),
+        scale: 1.2,
       },
     });
     
     // Zoom to the shape
-    editor.zoomToSelection([geoId], { duration: 200, inset: 100 });
+    editor.zoomToSelection([textId], { duration: 200, inset: 100 });
     
     try {
       // Stream AI response
@@ -69,9 +66,6 @@ export default function PromptInput({ editor, focusEventName }) {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let aiResponse = '';
-      
-      // Start editing the shape to add text
-      editor.setEditingShape(geoId);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -90,13 +84,12 @@ export default function PromptInput({ editor, focusEventName }) {
               if (parsed.content) {
                 aiResponse += parsed.content;
                 
-                // Update shape text by setting editing value
-                const textContent = `Q: ${promptText}\n\nAI: ${aiResponse}`;
+                // Update TEXT shape ON THE CANVAS with streaming richText
                 editor.updateShape({
-                  id: geoId,
-                  type: 'geo',
+                  id: textId,
+                  type: 'text',
                   props: {
-                    text: textContent,
+                    richText: toRichText(`Q: ${promptText}\n\nAI: ${aiResponse}`),
                   },
                 });
               }
@@ -107,17 +100,13 @@ export default function PromptInput({ editor, focusEventName }) {
         }
       }
       
-      // Stop editing
-      editor.setEditingShape(null);
-      
     } catch (error) {
       console.error('AI request failed:', error);
       editor.updateShape({
-        id: geoId,
-        type: 'geo',
+        id: textId,
+        type: 'text',
         props: {
-          color: 'light-red',
-          text: `Q: ${promptText}\n\nAI: Error - ${error.message}`,
+          richText: toRichText(`Q: ${promptText}\n\nAI: Error - ${error.message}`),
         },
       });
     }
