@@ -5,6 +5,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tldraw dotted background */
+.tl-background {
+  background-color: #f9fafb !important;
+  background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px) !important;
+  background-size: 20px 20px !important;
+}
+
 @layer base {
   :root {
     /* Canvas & Backgrounds */
