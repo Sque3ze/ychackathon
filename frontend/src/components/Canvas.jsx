@@ -6,6 +6,7 @@ import PromptInput from './PromptInput';
 import { PdfUploadButton } from './PdfUploadButton';
 import { PdfShapeUtil } from '../shapeUtils/PdfShapeUtil';
 import { VideoCallShapeUtil } from '../shapeUtils/VideoCallShapeUtil';
+import { C1ResponseShapeUtil } from '../shapeUtils/C1ResponseShapeUtil';
 import axios from 'axios';
 import 'tldraw/tldraw.css';
 
@@ -32,7 +33,7 @@ const components = {
 };
 
 // Custom shape utilities
-const customShapeUtils = [PdfShapeUtil, VideoCallShapeUtil];
+const customShapeUtils = [PdfShapeUtil, VideoCallShapeUtil, C1ResponseShapeUtil];
 
 export default function Canvas() {
   const editorRef = useRef(null);
