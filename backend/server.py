@@ -1,12 +1,25 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
 import json
 from datetime import datetime, timezone
 import uuid
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Optional
 from pydantic import BaseModel
+import tempfile
+import logging
+from dotenv import load_dotenv
+
+from pdf_processor import PDFProcessor, EmbeddingGenerator, SupabaseRAGStorage
+
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
