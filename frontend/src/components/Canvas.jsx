@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { Tldraw } from 'tldraw';
 import { useSyncDemo } from '@tldraw/sync';
 import { createShapeId } from '@tldraw/editor';
