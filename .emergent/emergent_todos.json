@@ -1,6 +1,38 @@
 [
   {
-    "content": "Fix persistence bug identified by testing agent - update to tldraw v4 API",
-    "status": "completed"
+    "content": "Install emergentintegrations library in backend",
+    "status": "pending"
+  },
+  {
+    "content": "Create FastAPI streaming endpoint with Claude Sonnet 4",
+    "status": "pending"
+  },
+  {
+    "content": "Create custom TextResponseShape type in frontend",
+    "status": "pending"
+  },
+  {
+    "content": "Create TextResponseShapeUtil for rendering AI responses",
+    "status": "pending"
+  },
+  {
+    "content": "Create API helper for streaming responses",
+    "status": "pending"
+  },
+  {
+    "content": "Create shape manager for creating AI chat shapes",
+    "status": "pending"
+  },
+  {
+    "content": "Create PromptInput component with Cmd+K shortcut",
+    "status": "pending"
+  },
+  {
+    "content": "Wire up custom shapes with tldraw editor",
+    "status": "pending"
+  },
+  {
+    "content": "Test AI chat feature end-to-end",
+    "status": "pending"
   }
 ]
