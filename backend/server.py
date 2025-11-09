@@ -4,8 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 import os
+from dotenv import load_dotenv
 import json
 import asyncio
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI()
 
