@@ -119,7 +119,7 @@ export default function PromptInput({ editor, focusEventName }) {
         alignItems: 'center',
         position: 'fixed',
         left: '50%',
-        top: '16px',
+        bottom: '16px',
         transform: 'translateX(-50%)',
         padding: '12px 20px',
         borderRadius: '16px',
