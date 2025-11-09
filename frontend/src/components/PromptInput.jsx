@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { createShapeId, useEditor } from 'tldraw';
+import { createShapeId } from 'tldraw';
 
 const backendUrl = process.env.REACT_APP_BACKEND_URL;
 
@@ -7,8 +7,7 @@ const isMac = () => {
   return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 };
 
-export default function PromptInput({ focusEventName }) {
-  const editor = useEditor();
+export default function PromptInput({ editor, focusEventName }) {
   const [isFocused, setIsFocused] = useState(false);
   const [prompt, setPrompt] = useState('');
   const showMacKeybinds = isMac();
