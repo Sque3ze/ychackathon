@@ -127,4 +127,4 @@ export const PromptInput = ({ focusEventName }) => {
       )}
     </form>
   );
-});
+};
