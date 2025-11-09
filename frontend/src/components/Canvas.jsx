@@ -4,6 +4,7 @@ import { useSyncDemo } from '@tldraw/sync';
 import { createShapeId } from '@tldraw/editor';
 import PromptInput from './PromptInput';
 import { PdfUploadButton } from './PdfUploadButton';
+import C1PlusButton from './C1PlusButton';
 import { PdfShapeUtil } from '../shapeUtils/PdfShapeUtil';
 import { VideoCallShapeUtil } from '../shapeUtils/VideoCallShapeUtil';
 import { C1ResponseShapeUtil } from '../shapeUtils/C1ResponseShapeUtil';
@@ -17,6 +18,7 @@ function CustomUI() {
   return (
     <>
       <PromptInput focusEventName={FOCUS_EVENT_NAME} />
+      <C1PlusButton />
     </>
   );
 }
@@ -47,7 +49,7 @@ export default function Canvas() {
   // Handle video call join - create as draggable canvas shape
   const handleJoinVideoCall = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
       const response = await axios.post(`${backendUrl}/api/video/room`, {
         room_id: DEFAULT_ROOM_ID
       });
@@ -79,7 +81,8 @@ export default function Canvas() {
       }
     } catch (error) {
       console.error('Failed to get video room:', error);
-      alert('Failed to join video call. Please try again.');
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Unknown error occurred';
+      alert(`Failed to join video call: ${errorMessage}`);
     }
   };
 
@@ -120,6 +123,25 @@ export default function Canvas() {
       }
       return next;
     });
+
+    // Remove provenance arrows when their target response shape is deleted
+    editor.sideEffects.registerAfterDeleteHandler('shape', (shape) => {
+      if (shape.type !== 'c1-response') {
+        return;
+      }
+
+      const arrowsToRemove = editor
+        .getCurrentPageShapes()
+        .filter(
+          (candidate) =>
+            candidate.type === 'arrow' &&
+            candidate.meta?.provenance?.targetId === shape.id
+        );
+
+      if (arrowsToRemove.length) {
+        editor.deleteShapes(arrowsToRemove.map((arrow) => arrow.id));
+      }
+    });
   };
 
   const handleUploadSuccess = (documentData) => {
@@ -151,7 +173,49 @@ export default function Canvas() {
 
       // Select the newly created shape
       editor.setSelectedShapes([shapeId]);
+
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+      if (backendUrl && documentData?.document_id) {
+        fetch(`${backendUrl}/api/pdf/canvas-link`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shapeId,
+            documentId: documentData.document_id,
+            roomId: DEFAULT_ROOM_ID,
+          }),
+        }).catch((error) => {
+          console.error('Failed to create pdf canvas link', error);
+        });
+      }
     }
+  };
+
+  const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+  const collectHandwritingStrokeIds = (seedIds, editor) => {
+    const visited = new Set();
+    const strokes = new Set();
+    const queue = [...seedIds];
+
+    while (queue.length) {
+      const currentId = queue.pop();
+      if (!currentId || visited.has(currentId)) continue;
+      visited.add(currentId);
+
+      const shape = editor.getShape(currentId);
+      if (!shape) continue;
+
+      if (shape.type === 'draw' && !shape.props.isClosed) {
+        strokes.add(shape.id);
+        continue;
+      }
+
+      const childIds = editor.getSortedChildIds?.(shape.id) ?? [];
+      queue.push(...childIds);
+    }
+
+    return Array.from(strokes);
   };
 
   // Helper function to auto-frame handwriting strokes and capture image
@@ -162,42 +226,31 @@ export default function Canvas() {
     const selectedIds = editor.getSelectedShapeIds();
     if (selectedIds.length === 0) return null;
 
-    // Filter to handwriting shapes (draw strokes that aren't closed)
-    const handwritingIds = [];
-    for (const id of selectedIds) {
-      const shape = editor.getShape(id);
-      if (!shape) continue;
-      
-      // Check if it's a draw shape that's not closed
-      if (shape.type === 'draw' && !shape.props.isClosed) {
-        handwritingIds.push(id);
-      }
-    }
+    const handwritingIds = collectHandwritingStrokeIds(selectedIds, editor);
 
     if (handwritingIds.length === 0) return null;
 
-    // Get bounds of selected handwriting shapes
-    const bounds = editor.getShapePageBounds(handwritingIds[0]);
-    if (!bounds) return null;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
 
-    // Calculate bounding box for all selected shapes
-    let minX = bounds.x;
-    let minY = bounds.y;
-    let maxX = bounds.x + bounds.w;
-    let maxY = bounds.y + bounds.h;
-
-    for (let i = 1; i < handwritingIds.length; i++) {
-      const shapeBounds = editor.getShapePageBounds(handwritingIds[i]);
-      if (!shapeBounds) continue;
-      
+    handwritingIds.forEach((id) => {
+      const shapeBounds = editor.getShapePageBounds(id);
+      if (!shapeBounds) return;
       minX = Math.min(minX, shapeBounds.x);
       minY = Math.min(minY, shapeBounds.y);
       maxX = Math.max(maxX, shapeBounds.x + shapeBounds.w);
       maxY = Math.max(maxY, shapeBounds.y + shapeBounds.h);
+    });
+
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+      console.warn('Unable to calculate handwriting bounds for selection');
+      return null;
     }
 
     // Add padding
-    const padding = 20;
+    const padding = 24;
     minX -= padding;
     minY -= padding;
     maxX += padding;
@@ -214,7 +267,6 @@ export default function Canvas() {
 
     let frameId = null;
     let captureIds = [];
-    let groupId = null;
 
     // Wrap all operations in editor.run for proper history/sync
     editor.run(() => {
@@ -228,7 +280,11 @@ export default function Canvas() {
         props: {
           w: frameWidth,
           h: frameHeight,
-          name: 'Handwriting Frame',
+          name: 'Handwriting Note',
+        },
+        meta: {
+          handwritingNoteId: frameId,
+          handwritingStrokeIds: handwritingIds,
         },
       });
 
@@ -239,22 +295,7 @@ export default function Canvas() {
       editor.reparentShapes(handwritingIds, frameId);
 
       captureIds = [frameId, ...handwritingIds];
-
-      // Group the frame and all strokes (tldraw auto-selects the group)
-      groupId = editor.groupShapes(captureIds);
-
-      // Lock the group shape to prevent resizing (only allow moving)
-      if (groupId) {
-        editor.updateShape({
-          id: groupId,
-          type: 'group',
-          meta: {
-            noResize: true,
-          },
-        });
-      }
-
-      // Note: No need to manually select - tldraw automatically selects the group after groupShapes()
+      editor.setSelectedShapes([frameId]);
     });
 
     if (!frameId) {
@@ -263,7 +304,6 @@ export default function Canvas() {
 
     return {
       frameId,
-      groupId,
       captureIds,
       handwritingIds,
       bounds: boundsPayload,
@@ -283,7 +323,7 @@ export default function Canvas() {
       console.log('Starting frame capture for ids:', idsToExport.join(', '));
       
       // Give tldraw a moment to render the frame
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForNextFrame();
       
       // Capture frame as blob using tldraw's export helpers
       const imageResult = await editor.toImage(idsToExport, {
@@ -323,9 +363,6 @@ export default function Canvas() {
       }
       if (capturePayload?.handwritingIds?.length) {
         formData.append('handwritingShapeIds', JSON.stringify(capturePayload.handwritingIds));
-      }
-      if (capturePayload?.groupId) {
-        formData.append('groupId', capturePayload.groupId);
       }
       if (roomId) {
         formData.append('roomId', roomId);
