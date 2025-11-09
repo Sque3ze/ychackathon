@@ -258,6 +258,11 @@ export default function PromptInput({ focusEventName }) {
       });
     }
 
+    const responseSize = {
+      w: newShapeWidth,
+      h: newShapeHeight,
+    };
+
     editor.run(() => {
       editor.createShape({
         id: c1ShapeId,

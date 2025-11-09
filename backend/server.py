@@ -67,6 +67,38 @@ class TypedNoteSyncRequest(BaseModel):
     textShapes: List[TypedNoteShape]
 
 
+def _extract_text_from_richtext(rich_text: Dict) -> str:
+    """
+    Recursively extract plain text from tldraw's richText structure (ProseMirror format).
+    
+    Structure example:
+    {
+        'type': 'doc',
+        'content': [
+            {
+                'type': 'paragraph',
+                'content': [
+                    {'type': 'text', 'text': 'actual text here'}
+                ]
+            }
+        ]
+    }
+    """
+    if not rich_text or not isinstance(rich_text, dict):
+        return ""
+    
+    # If it's a text node, return the text directly
+    if rich_text.get("type") == "text" and rich_text.get("text"):
+        return rich_text["text"]
+    
+    # If it has content array, recursively extract text from all children
+    content = rich_text.get("content")
+    if isinstance(content, list):
+        return "".join(_extract_text_from_richtext(node) for node in content)
+    
+    return ""
+
+
 def format_selection_context(entries: List[Dict]) -> str:
     if not entries:
         return ""
@@ -189,7 +221,7 @@ async def ask_stream(request: PromptRequest):
     selection_context_text = ""
 
     if selected_shape_ids:
-        logger.info("ask_stream received %d selected shapes", len(selected_shape_ids))
+        logger.info("ask_stream received %d selected shapes: %s", len(selected_shape_ids), selected_shape_ids)
         try:
             query_embedding = embedding_gen.generate_embeddings([request.prompt])[0]
             selection_context_entries = storage.search_context_for_shape_ids(
@@ -198,8 +230,17 @@ async def ask_stream(request: PromptRequest):
                 handwriting_limit_per_note=5,
                 pdf_limit_per_document=5,
                 typed_limit_per_note=5,
-                threshold=0.2,
+                threshold=0.1,  # Lower threshold to be more lenient with matches
             )
+            logger.info(
+                "Found %d context entries: %d handwriting, %d pdf, %d typed",
+                len(selection_context_entries),
+                sum(1 for e in selection_context_entries if e.get("source_type") == "handwriting"),
+                sum(1 for e in selection_context_entries if e.get("source_type") == "pdf"),
+                sum(1 for e in selection_context_entries if e.get("source_type") == "typed"),
+            )
+            if selection_context_entries:
+                logger.debug("Context entries preview: %s", selection_context_entries[:2])
         except Exception as e:
             logger.error("Failed generating embeddings or searching context: %s", e, exc_info=True)
             selection_context_entries = storage.get_context_for_shape_ids(
@@ -208,8 +249,10 @@ async def ask_stream(request: PromptRequest):
                 pdf_limit_per_document=5,
                 typed_limit_per_note=5,
             )
+            logger.info("Fallback: Found %d context entries (non-semantic)", len(selection_context_entries))
 
         selection_context_text = format_selection_context(selection_context_entries)
+        logger.info("Formatted context text length: %d chars", len(selection_context_text))
     else:
         logger.info("ask_stream invoked without selected shapes")
     
@@ -551,6 +594,21 @@ async def sync_typed_note(request: TypedNoteSyncRequest):
         raise HTTPException(status_code=400, detail="No text shapes provided")
 
     try:
+        # Log the full request for debugging
+        logger.info(
+            "Typed note sync request: frameId=%s, shapes_count=%d",
+            request.frameId,
+            len(request.textShapes),
+        )
+        for idx, shape in enumerate(request.textShapes[:3]):  # Log first 3 shapes
+            logger.info(
+                "Shape[%d]: shapeId=%s, text=%r, props=%r",
+                idx,
+                shape.shapeId,
+                shape.text,
+                shape.props,
+            )
+
         text_shapes_payload = []
         chunk_texts = []
         chunk_metadata = []
@@ -561,12 +619,28 @@ async def sync_typed_note(request: TypedNoteSyncRequest):
         )
 
         for index, shape in enumerate(sorted_shapes):
-            text_value = (shape.text or "").strip()
+            raw_props = shape.props or {}
+            try:
+                props_dict = dict(raw_props)
+            except Exception:
+                props_dict = raw_props if isinstance(raw_props, dict) else {}
+            raw_text = shape.text
+            
+            # Extract text from richText structure (tldraw's ProseMirror format)
+            rich_text = props_dict.get("richText") if isinstance(props_dict, dict) else None
+            rich_text_content = ""
+            if rich_text and isinstance(rich_text, dict):
+                rich_text_content = _extract_text_from_richtext(rich_text)
+            
+            # Try multiple sources: richText (newer), direct text prop (older), or shape.text
+            fallback_text = props_dict.get("text") if isinstance(props_dict, dict) else None
+            text_value = (rich_text_content or raw_text or fallback_text or "").strip()
             shape_payload = {
                 "shape_id": shape.shapeId,
-                "text": shape.text,
+                # Persist the best-effort text that we will also embed
+                "text": rich_text_content or raw_text if raw_text is not None else (fallback_text or ""),
                 "order": shape.order if shape.order is not None else index,
-                "props": shape.props or {},
+                "props": props_dict,
             }
             text_shapes_payload.append(shape_payload)
 
@@ -576,8 +650,16 @@ async def sync_typed_note(request: TypedNoteSyncRequest):
                     {
                         "shape_id": shape.shapeId,
                         "order": shape_payload["order"],
-                        "props": shape.props or {},
+                        "props": props_dict,
                     }
+                )
+            else:
+                logger.debug(
+                    "Shape %s has no embed-able text: raw_text=%r, fallback_text=%r, rich_text_content=%r",
+                    shape.shapeId,
+                    raw_text,
+                    fallback_text,
+                    rich_text_content,
                 )
 
         note_id = storage.insert_typed_note(
@@ -591,6 +673,21 @@ async def sync_typed_note(request: TypedNoteSyncRequest):
         embeddings = []
         if chunk_texts:
             embeddings = embedding_gen.generate_embeddings(chunk_texts)
+        else:
+            logger.warning(
+                "Typed note sync for frame %s contained %d shapes but no embed-able text",
+                request.frameId,
+                len(sorted_shapes),
+            )
+            # Don't delete existing chunks if there's no new text to embed
+            # This preserves existing embeddings if text extraction temporarily fails
+            return {
+                "success": True,
+                "note_id": note_id,
+                "frameId": request.frameId,
+                "chunk_count": 0,
+                "warning": "No embed-able text found in shapes",
+            }
 
         chunks_payload = []
         for idx, text_value in enumerate(chunk_texts):
