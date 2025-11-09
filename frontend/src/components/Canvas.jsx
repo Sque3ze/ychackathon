@@ -1,18 +1,24 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Tldraw, DefaultToolbar, TldrawUiMenuItem, useEditor } from 'tldraw';
-import { useSyncDemo } from '@tldraw/sync';
-import { createShapeId } from '@tldraw/editor';
-import PromptInput from './PromptInput';
-import { PdfUploadButton } from './PdfUploadButton';
-import C1PlusButton from './C1PlusButton';
-import { PdfShapeUtil } from '../shapeUtils/PdfShapeUtil';
-import { VideoCallShapeUtil } from '../shapeUtils/VideoCallShapeUtil';
-import { C1ResponseShapeUtil } from '../shapeUtils/C1ResponseShapeUtil';
-import axios from 'axios';
-import 'tldraw/tldraw.css';
+import React, { useEffect, useState, useRef, useMemo } from "react";
+import {
+  Tldraw,
+  DefaultToolbar,
+  TldrawUiMenuItem,
+  useEditor,
+  TLComponents,
+} from "tldraw";
+import { useSyncDemo } from "@tldraw/sync";
+import { createShapeId } from "@tldraw/editor";
+import PromptInput from "./PromptInput";
+import { PdfUploadButton } from "./PdfUploadButton";
+import C1PlusButton from "./C1PlusButton";
+import { PdfShapeUtil } from "../shapeUtils/PdfShapeUtil";
+import { VideoCallShapeUtil } from "../shapeUtils/VideoCallShapeUtil";
+import { C1ResponseShapeUtil } from "../shapeUtils/C1ResponseShapeUtil";
+import axios from "axios";
+import "tldraw/tldraw.css";
 
-const FOCUS_EVENT_NAME = 'focus-prompt-input';
-const DEFAULT_ROOM_ID = 'default';
+const FOCUS_EVENT_NAME = "focus-prompt-input";
+const DEFAULT_ROOM_ID = "default";
 
 function CustomUI() {
   return (
@@ -23,11 +29,18 @@ function CustomUI() {
   );
 }
 
-const components = {
+const components: TLComponents = {
   Toolbar: () => {
     return (
-      <div style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)' }}>
-        <DefaultToolbar />
+      <div
+        style={{
+          position: "fixed",
+          top: "40%",
+          left: 8,
+          transform: "translateY(-50%)",
+        }}
+      >
+        <DefaultToolbar orientation="vertical" />
       </div>
     );
   },
@@ -35,7 +48,11 @@ const components = {
 };
 
 // Custom shape utilities
-const customShapeUtils = [PdfShapeUtil, VideoCallShapeUtil, C1ResponseShapeUtil];
+const customShapeUtils = [
+  PdfShapeUtil,
+  VideoCallShapeUtil,
+  C1ResponseShapeUtil,
+];
 
 export default function Canvas() {
   const editorRef = useRef(null);
@@ -49,9 +66,10 @@ export default function Canvas() {
   // Handle video call join - create as draggable canvas shape
   const handleJoinVideoCall = async () => {
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+      const backendUrl =
+        process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
       const response = await axios.post(`${backendUrl}/api/video/room`, {
-        room_id: DEFAULT_ROOM_ID
+        room_id: DEFAULT_ROOM_ID,
       });
 
       // Create a video call shape on the canvas
@@ -66,7 +84,7 @@ export default function Canvas() {
 
         editor.createShape({
           id: shapeId,
-          type: 'video-call',
+          type: "video-call",
           x: centerX - 400, // Center the shape (half of default width)
           y: centerY - 300, // Center the shape (half of default height)
           props: {
@@ -80,34 +98,37 @@ export default function Canvas() {
         editor.setSelectedShapes([shapeId]);
       }
     } catch (error) {
-      console.error('Failed to get video room:', error);
-      const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Unknown error occurred';
+      console.error("Failed to get video room:", error);
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Unknown error occurred";
       alert(`Failed to join video call: ${errorMessage}`);
     }
   };
 
-
   // Register Cmd+K shortcut
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         window.dispatchEvent(new Event(FOCUS_EVENT_NAME));
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // Handle editor mount
   const handleMount = (editor) => {
     editorRef.current = editor;
-    
+
     // Add listener to prevent resizing of groups with noResize meta flag
-    editor.sideEffects.registerBeforeChangeHandler('shape', (prev, next) => {
+    editor.sideEffects.registerBeforeChangeHandler("shape", (prev, next) => {
       // Check if this is a group with noResize flag
-      if (next.type === 'group' && next.meta?.noResize) {
+      if (next.type === "group" && next.meta?.noResize) {
         // If size changed, revert to previous size
         // Groups don't have w/h props directly, so we check if any child transformations happened
         // For groups, we just prevent the resize by returning the previous state
@@ -125,8 +146,8 @@ export default function Canvas() {
     });
 
     // Remove provenance arrows when their target response shape is deleted
-    editor.sideEffects.registerAfterDeleteHandler('shape', (shape) => {
-      if (shape.type !== 'c1-response') {
+    editor.sideEffects.registerAfterDeleteHandler("shape", (shape) => {
+      if (shape.type !== "c1-response") {
         return;
       }
 
@@ -134,7 +155,7 @@ export default function Canvas() {
         .getCurrentPageShapes()
         .filter(
           (candidate) =>
-            candidate.type === 'arrow' &&
+            candidate.type === "arrow" &&
             candidate.meta?.provenance?.targetId === shape.id
         );
 
@@ -145,7 +166,7 @@ export default function Canvas() {
   };
 
   const handleUploadSuccess = (documentData) => {
-    console.log('PDF uploaded successfully:', documentData);
+    console.log("PDF uploaded successfully:", documentData);
 
     // Create a PDF shape on the canvas
     if (editorRef.current) {
@@ -159,7 +180,7 @@ export default function Canvas() {
 
       editor.createShape({
         id: shapeId,
-        type: 'pdf-viewer',
+        type: "pdf-viewer",
         x: centerX - 300, // Center the shape (half of default width)
         y: centerY - 400, // Center the shape (half of default height)
         props: {
@@ -174,24 +195,27 @@ export default function Canvas() {
       // Select the newly created shape
       editor.setSelectedShapes([shapeId]);
 
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || "";
       if (backendUrl && documentData?.document_id) {
         fetch(`${backendUrl}/api/pdf/canvas-link`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             shapeId,
             documentId: documentData.document_id,
             roomId: DEFAULT_ROOM_ID,
           }),
         }).catch((error) => {
-          console.error('Failed to create pdf canvas link', error);
+          console.error("Failed to create pdf canvas link", error);
         });
       }
     }
   };
 
-  const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const waitForNextFrame = () =>
+    new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))
+    );
 
   const collectHandwritingStrokeIds = (seedIds, editor) => {
     const visited = new Set();
@@ -206,7 +230,7 @@ export default function Canvas() {
       const shape = editor.getShape(currentId);
       if (!shape) continue;
 
-      if (shape.type === 'draw' && !shape.props.isClosed) {
+      if (shape.type === "draw" && !shape.props.isClosed) {
         strokes.add(shape.id);
         continue;
       }
@@ -244,8 +268,13 @@ export default function Canvas() {
       maxY = Math.max(maxY, shapeBounds.y + shapeBounds.h);
     });
 
-    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-      console.warn('Unable to calculate handwriting bounds for selection');
+    if (
+      !isFinite(minX) ||
+      !isFinite(minY) ||
+      !isFinite(maxX) ||
+      !isFinite(maxY)
+    ) {
+      console.warn("Unable to calculate handwriting bounds for selection");
       return null;
     }
 
@@ -274,13 +303,13 @@ export default function Canvas() {
       frameId = createShapeId();
       editor.createShape({
         id: frameId,
-        type: 'frame',
+        type: "frame",
         x: minX,
         y: minY,
         props: {
           w: frameWidth,
           h: frameHeight,
-          name: 'Handwriting Note',
+          name: "Handwriting Note",
         },
         meta: {
           handwritingNoteId: frameId,
@@ -311,23 +340,31 @@ export default function Canvas() {
   };
 
   // Helper function to capture and upload frame image
-  const captureAndUploadFrame = async (editor, capturePayload, roomId = DEFAULT_ROOM_ID) => {
+  const captureAndUploadFrame = async (
+    editor,
+    capturePayload,
+    roomId = DEFAULT_ROOM_ID
+  ) => {
     if (!editor || !capturePayload) return;
 
     const { frameId, captureIds } = capturePayload;
-    const idsToExport = captureIds?.length ? captureIds : frameId ? [frameId] : [];
+    const idsToExport = captureIds?.length
+      ? captureIds
+      : frameId
+      ? [frameId]
+      : [];
 
     if (!idsToExport.length) return;
 
     try {
-      console.log('Starting frame capture for ids:', idsToExport.join(', '));
-      
+      console.log("Starting frame capture for ids:", idsToExport.join(", "));
+
       // Give tldraw a moment to render the frame
       await waitForNextFrame();
-      
+
       // Capture frame as blob using tldraw's export helpers
       const imageResult = await editor.toImage(idsToExport, {
-        format: 'png',
+        format: "png",
         background: true,
         pixelRatio: 2,
         padding: 0,
@@ -336,61 +373,71 @@ export default function Canvas() {
       const blob = imageResult?.blob;
 
       if (!blob) {
-        console.error('Failed to capture frame image - blob is null');
+        console.error("Failed to capture frame image - blob is null");
         return;
       }
 
-      console.log('Frame captured, blob size:', blob.size);
+      console.log("Frame captured, blob size:", blob.size);
 
       // Upload to backend
       const formData = new FormData();
 
-      if (typeof File !== 'undefined') {
-        const file = new File([blob], `${frameId || 'handwriting-note'}.png`, {
-          type: 'image/png',
+      if (typeof File !== "undefined") {
+        const file = new File([blob], `${frameId || "handwriting-note"}.png`, {
+          type: "image/png",
         });
-        formData.append('file', file);
+        formData.append("file", file);
       } else {
-        formData.append('file', blob, `${frameId || 'handwriting-note'}.png`);
+        formData.append("file", blob, `${frameId || "handwriting-note"}.png`);
       }
 
       if (frameId) {
-        formData.append('frameId', frameId);
+        formData.append("frameId", frameId);
       }
-      formData.append('timestamp', new Date().toISOString());
+      formData.append("timestamp", new Date().toISOString());
       if (capturePayload?.bounds) {
-        formData.append('bounds', JSON.stringify(capturePayload.bounds));
+        formData.append("bounds", JSON.stringify(capturePayload.bounds));
       }
       if (capturePayload?.handwritingIds?.length) {
-        formData.append('handwritingShapeIds', JSON.stringify(capturePayload.handwritingIds));
+        formData.append(
+          "handwritingShapeIds",
+          JSON.stringify(capturePayload.handwritingIds)
+        );
       }
       if (roomId) {
-        formData.append('roomId', roomId);
+        formData.append("roomId", roomId);
       }
 
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || "";
       if (!backendUrl) {
-        console.warn('REACT_APP_BACKEND_URL is not set; skipping handwriting upload.');
+        console.warn(
+          "REACT_APP_BACKEND_URL is not set; skipping handwriting upload."
+        );
         return;
       }
       const uploadUrl = `${backendUrl}/api/handwriting-upload`;
-      console.log('Uploading handwriting snapshot to:', uploadUrl);
-      
+      console.log("Uploading handwriting snapshot to:", uploadUrl);
+
       const response = await fetch(uploadUrl, {
-        method: 'POST',
+        method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        let errorText = '';
+        let errorText = "";
         try {
           const errorClone = response.clone();
           errorText = await errorClone.text();
         } catch (cloneError) {
-          console.warn('Failed to read handwriting upload error body', cloneError);
+          console.warn(
+            "Failed to read handwriting upload error body",
+            cloneError
+          );
         }
         throw new Error(
-          `Upload failed (${response.status}): ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
+          `Upload failed (${response.status}): ${response.statusText}${
+            errorText ? ` - ${errorText}` : ""
+          }`
         );
       }
 
@@ -398,51 +445,55 @@ export default function Canvas() {
       try {
         data = await response.json();
       } catch (jsonError) {
-        console.warn('Handwriting upload response is not JSON', jsonError);
+        console.warn("Handwriting upload response is not JSON", jsonError);
       }
-      console.log('Frame uploaded successfully:', data);
-
+      console.log("Frame uploaded successfully:", data);
     } catch (error) {
-      console.error('Error capturing or uploading frame:', error);
+      console.error("Error capturing or uploading frame:", error);
       // Don't block UI - just log the error
     }
   };
 
   // Define custom overrides for keyboard shortcuts and component behavior
-  const overrides = useMemo(() => ({
-    actions(editor, actions) {
-      return {
-        ...actions,
-        'auto-frame-handwriting': {
-          id: 'auto-frame-handwriting',
-          label: 'Frame Handwriting',
-          kbd: 's',
-          async onSelect() {
-            // Create frame and group
-            const frameData = await autoFrameHandwriting(editor);
+  const overrides = useMemo(
+    () => ({
+      actions(editor, actions) {
+        return {
+          ...actions,
+          "auto-frame-handwriting": {
+            id: "auto-frame-handwriting",
+            label: "Frame Handwriting",
+            kbd: "s",
+            async onSelect() {
+              // Create frame and group
+              const frameData = await autoFrameHandwriting(editor);
 
-            // If frame was created, capture and upload image
-            if (frameData) {
-              await captureAndUploadFrame(editor, frameData, DEFAULT_ROOM_ID);
-            }
+              // If frame was created, capture and upload image
+              if (frameData) {
+                await captureAndUploadFrame(editor, frameData, DEFAULT_ROOM_ID);
+              }
+            },
           },
-        },
-      };
-    },
-  }), []);
+        };
+      },
+    }),
+    []
+  );
 
   return (
-    <div style={{ position: 'fixed', inset: 0 }}>
+    <div style={{ position: "fixed", inset: 0 }}>
       {/* Button group - bottom left */}
-      <div style={{
-        position: 'absolute',
-        bottom: '80px',
-        left: '16px',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px'
-      }}>
+      <div
+        style={{
+          position: "absolute",
+          bottom: "80px",
+          left: "16px",
+          zIndex: 1000,
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+        }}
+      >
         {/* Upload PDF button - icon only */}
         <PdfUploadButton onUploadSuccess={handleUploadSuccess} iconOnly />
 
@@ -450,33 +501,40 @@ export default function Canvas() {
         <button
           onClick={handleJoinVideoCall}
           style={{
-            padding: '12px',
-            background: '#3B82F6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
-            transition: 'all 0.2s',
-            width: '44px',
-            height: '44px'
+            padding: "12px",
+            background: "#3B82F6",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 2px 8px rgba(59, 130, 246, 0.3)",
+            transition: "all 0.2s",
+            width: "44px",
+            height: "44px",
           }}
           onMouseEnter={(e) => {
-            e.target.style.background = '#2563EB';
-            e.target.style.transform = 'translateY(-1px)';
-            e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+            e.target.style.background = "#2563EB";
+            e.target.style.transform = "translateY(-1px)";
+            e.target.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.4)";
           }}
           onMouseLeave={(e) => {
-            e.target.style.background = '#3B82F6';
-            e.target.style.transform = 'translateY(0)';
-            e.target.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)';
+            e.target.style.background = "#3B82F6";
+            e.target.style.transform = "translateY(0)";
+            e.target.style.boxShadow = "0 2px 8px rgba(59, 130, 246, 0.3)";
           }}
           title="Join Video Call"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M23 7l-7 5 7 5V7z" />
             <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
           </svg>
@@ -491,7 +549,6 @@ export default function Canvas() {
         overrides={overrides}
         shapeUtils={customShapeUtils}
       />
-
     </div>
   );
 }
