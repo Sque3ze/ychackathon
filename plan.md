@@ -78,8 +78,48 @@
 
 ---
 
+### Phase 3.1: Auto-Frame Handwriting Feature ✅ COMPLETED
+**Status:** COMPLETED - Feature fully functional
+
+**Achievements:**
+- ✅ Implemented keyboard shortcut 's' to auto-frame selected handwriting strokes
+- ✅ Frame creation with proper z-index (frame appears behind strokes using `sendToBack`)
+- ✅ Automatic reparenting of handwriting strokes into the frame
+- ✅ Grouping of frame + strokes as single object
+- ✅ Non-resizable behavior (group can only be moved, not resized)
+- ✅ Integration with tldraw's native behaviors (undo, delete, multiplayer sync)
+- ✅ Custom `beforeChange` handler to prevent resize operations on groups with `noResize` meta flag
+
+**Implementation Details:**
+- Modified `/app/frontend/src/components/Canvas.jsx` only
+- Added `editorRef` to capture editor instance on mount
+- Created `autoFrameHandwriting()` helper function that:
+  - Filters selection to draw strokes that aren't closed
+  - Calculates bounding box with 20px padding
+  - Creates frame shape and sends it to back
+  - Reparents strokes into frame
+  - Groups frame + strokes
+  - Adds `noResize: true` meta flag to group
+- Added `sideEffects.registerBeforeChangeHandler` to prevent resize operations
+- Used tldraw's `overrides` prop to inject custom 's' keyboard action
+- All operations wrapped in `editor.run()` for proper history and multiplayer sync
+
+**User Stories Completed:**
+1. ✅ As a user, I can select handwriting strokes and press 's' to auto-frame them
+2. ✅ As a user, the frame appears behind my strokes (not covering them)
+3. ✅ As a user, the framed group behaves like a note (movable but not resizable)
+4. ✅ As a user, I can undo the frame operation with ⌘+Z
+5. ✅ As a user, the auto-frame feature works in multiplayer (syncs to other users)
+
+**Bug Fixes:**
+- Fixed shape ID validation error (select frameId instead of invalid groupId)
+- Fixed frame positioning (using `sendToBack` instead of manual index manipulation)
+- Implemented non-resizable constraint via meta flag and beforeChange handler
+
+---
+
 ### Phase 3: Features & Hardening (IN PROGRESS)
-**Status:** READY TO START
+**Status:** PARTIALLY COMPLETED (Phase 3.1 done, remaining tasks ready to start)
 
 **Priority Tasks:**
 1. **User Presence Implementation** (HIGH)
@@ -135,7 +175,7 @@
 
 **Planned Features:**
 1. **UI Polish**
-   - Keyboard shortcuts displayed in tooltips (V=select, D=draw, etc.)
+   - Keyboard shortcuts displayed in tooltips (V=select, D=draw, S=auto-frame, etc.)
    - Improved focus states for accessibility
    - Refined shadows and transitions
    - Respect `prefers-reduced-motion` media query
@@ -179,11 +219,12 @@
 - **Connection:** Stable WebSocket with auto-reconnect and status indicator
 - **Persistence:** Canvas state saves to MongoDB and restores on page refresh
 - **Testing:** 87% overall test pass rate (100% backend, 95% frontend basic functionality)
+- **Auto-Frame Feature:** Keyboard shortcut 's' to frame handwriting strokes (non-resizable, movable)
 
 ### 🚧 In Progress
-- None (Phase 1 and 2 completed)
+- None (Phase 3.1 completed, Phase 3 remaining tasks ready to start)
 
-### 📋 Next Up (Phase 3)
+### 📋 Next Up (Phase 3 Remaining)
 1. Implement user presence with collaborative cursors
 2. Multi-tab real-time collaboration testing
 3. Enhanced error handling and retry logic
@@ -204,7 +245,13 @@
 - ✅ UX: Canvas-first minimal UI with Inter font and tokenized colors
 - ✅ Tests: 87% overall pass rate with critical persistence bug fixed
 
-### Phase 3 (TARGET)
+### Phase 3.1 (ACHIEVED ✅)
+- ✅ Auto-frame: 's' keyboard shortcut creates frame around selected handwriting
+- ✅ Positioning: Frame appears behind strokes (proper z-index)
+- ✅ Behavior: Grouped frame is movable but not resizable
+- ✅ Integration: Works with undo, delete, and multiplayer sync
+
+### Phase 3 Remaining (TARGET)
 - Real-time: Two or more clients observe each other's edits within 300ms median
 - Presence: Users see each other's cursors with names and colors
 - Stability: No crashes on malformed input; rate limits prevent abuse
@@ -264,6 +311,28 @@
 
 ---
 
+## Keyboard Shortcuts
+
+### Native TLDraw Shortcuts
+- `V` - Select tool
+- `D` - Draw tool
+- `E` - Eraser tool
+- `A` - Arrow tool
+- `R` - Rectangle tool
+- `O` - Ellipse tool
+- `T` - Text tool
+- `N` - Note tool
+- `F` - Frame tool
+- `⌘+Z` / `Ctrl+Z` - Undo
+- `⌘+Shift+Z` / `Ctrl+Shift+Z` - Redo
+- `⌘+A` / `Ctrl+A` - Select all
+- `Delete` / `Backspace` - Delete selection
+
+### Custom Shortcuts
+- `S` - Auto-frame selected handwriting strokes (Phase 3.1)
+
+---
+
 ## Deployment Notes
 
 ### Environment Variables
@@ -287,3 +356,4 @@
 - **Preview URL:** https://drawsync.preview.emergentagent.com
 - **tldraw Documentation:** https://tldraw.dev/docs
 - **tldraw v4 API:** https://tldraw.dev/reference/editor
+- **Auto-Frame Implementation:** `/app/frontend/src/components/Canvas.jsx` (lines 21-120)
