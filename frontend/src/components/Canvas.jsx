@@ -74,26 +74,22 @@ export default function Canvas() {
 
     // Wrap all operations in editor.run for proper history/sync
     editor.run(() => {
-      // Get the lowest index from handwriting shapes to place frame behind
-      const lowestIndex = handwritingShapes.reduce((lowest, shape) => {
-        return shape.index < lowest ? shape.index : lowest;
-      }, handwritingShapes[0].index);
-
-      // Create frame shape with index behind all strokes
+      // Create frame shape
       const frameId = createShapeId();
       editor.createShape({
         id: frameId,
         type: 'frame',
         x: minX,
         y: minY,
-        index: `a${lowestIndex}`, // Place frame behind by prepending to index
         props: {
           w: frameWidth,
           h: frameHeight,
           name: 'Handwriting Frame',
         },
-        isLocked: false, // Keep unlocked for moving but we'll handle resize separately
       });
+
+      // Send frame to back so it appears behind the strokes
+      editor.sendToBack([frameId]);
 
       // Reparent handwriting strokes into the frame
       editor.reparentShapes(handwritingIds, frameId);
@@ -101,22 +97,21 @@ export default function Canvas() {
       // Group the frame and all strokes
       const groupId = editor.groupShapes([frameId, ...handwritingIds]);
 
-      // Update the group to prevent resizing by setting meta flag
+      // Lock the group shape to prevent resizing (only allow moving)
       if (groupId) {
-        const groupShape = editor.getShape(groupId);
-        if (groupShape) {
-          editor.updateShape({
-            ...groupShape,
-            meta: {
-              ...groupShape.meta,
-              noResize: true,
-            },
-          });
-        }
+        editor.updateShape({
+          id: groupId,
+          type: 'group',
+          meta: {
+            noResize: true,
+          },
+        });
       }
 
-      // Select the frame (which now contains all the grouped strokes)
-      editor.select(frameId);
+      // Select the group
+      if (groupId) {
+        editor.select(groupId);
+      }
     });
   };
 
