@@ -54,11 +54,15 @@ const PdfViewerComponent = memo(({ shape }) => {
     console.log('Filename:', filename);
   }, [documentUrl, documentId, filename]);
 
-  const goToPrevPage = () => {
+  const goToPrevPage = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
     setPageNumber(prev => Math.max(1, prev - 1));
   };
 
-  const goToNextPage = () => {
+  const goToNextPage = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
     setPageNumber(prev => Math.min(numPages || prev, prev + 1));
   };
 
@@ -202,6 +206,7 @@ const PdfViewerComponent = memo(({ shape }) => {
         }}>
           <button
             onClick={goToPrevPage}
+            onPointerDown={(e) => e.stopPropagation()}
             disabled={pageNumber <= 1}
             style={{
               padding: '6px 12px',
@@ -211,7 +216,8 @@ const PdfViewerComponent = memo(({ shape }) => {
               cursor: pageNumber <= 1 ? 'not-allowed' : 'pointer',
               fontSize: '14px',
               color: pageNumber <= 1 ? '#9CA3AF' : '#111827',
-              fontWeight: '500'
+              fontWeight: '500',
+              pointerEvents: 'all'
             }}
           >
             ←
@@ -226,6 +232,7 @@ const PdfViewerComponent = memo(({ shape }) => {
           </span>
           <button
             onClick={goToNextPage}
+            onPointerDown={(e) => e.stopPropagation()}
             disabled={pageNumber >= numPages}
             style={{
               padding: '6px 12px',
@@ -235,7 +242,8 @@ const PdfViewerComponent = memo(({ shape }) => {
               cursor: pageNumber >= numPages ? 'not-allowed' : 'pointer',
               fontSize: '14px',
               color: pageNumber >= numPages ? '#9CA3AF' : '#111827',
-              fontWeight: '500'
+              fontWeight: '500',
+              pointerEvents: 'all'
             }}
           >
             →
