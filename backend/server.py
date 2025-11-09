@@ -1,16 +1,15 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os
-from motor.motor_asyncio import AsyncIOMotorClient
-import json
-from datetime import datetime, timezone
-import uuid
-from typing import Dict, List, Set
 from pydantic import BaseModel
+from emergentintegrations.llm.chat import LlmChat, UserMessage
+import os
+import json
+import asyncio
 
 app = FastAPI()
 
-# CORS configuration
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,191 +18,67 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# MongoDB setup
-mongo_url = os.environ.get('MONGO_URL')
-client = AsyncIOMotorClient(mongo_url)
-db = client.tldraw_canvas
-
-# In-memory connection manager
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: Dict[str, Set[WebSocket]] = {}
-        
-    async def connect(self, websocket: WebSocket, room_id: str):
-        await websocket.accept()
-        if room_id not in self.active_connections:
-            self.active_connections[room_id] = set()
-        self.active_connections[room_id].add(websocket)
-        
-    def disconnect(self, websocket: WebSocket, room_id: str):
-        if room_id in self.active_connections:
-            self.active_connections[room_id].discard(websocket)
-            if not self.active_connections[room_id]:
-                del self.active_connections[room_id]
-    
-    async def broadcast(self, room_id: str, message: dict, exclude: WebSocket = None):
-        if room_id not in self.active_connections:
-            return
-        
-        disconnected = set()
-        for connection in self.active_connections[room_id]:
-            if connection != exclude:
-                try:
-                    await connection.send_json(message)
-                except Exception:
-                    disconnected.add(connection)
-        
-        # Clean up disconnected connections
-        for conn in disconnected:
-            self.active_connections[room_id].discard(conn)
-
-manager = ConnectionManager()
-
-# Models
-class SnapshotUpdate(BaseModel):
-    snapshot: dict
+class PromptRequest(BaseModel):
+    prompt: str
+    context: str | None = None
 
 @app.get("/")
 async def root():
-    return {"message": "tldraw collaboration server is running"}
+    return {"message": "tldraw AI chat server"}
 
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
 
-@app.get("/api/sync/rooms/{room_id}/snapshot")
-async def get_snapshot(room_id: str):
-    """Get the latest snapshot for a room"""
+@app.post("/api/ask")
+async def ask_stream(request: PromptRequest):
+    """Stream Claude Sonnet 4 chat completion response"""
     try:
-        room = await db.rooms.find_one({"room_id": room_id})
-        if not room:
-            # Create default empty snapshot
-            default_snapshot = {
-                "store": {},
-                "schema": {
-                    "schemaVersion": 2,
-                    "sequences": {}
-                }
-            }
-            
-            new_room = {
-                "room_id": room_id,
-                "snapshot": default_snapshot,
-                "version": 0,
-                "created_at": datetime.now(timezone.utc),
-                "updated_at": datetime.now(timezone.utc)
-            }
-            
-            await db.rooms.insert_one(new_room)
-            return {"snapshot": default_snapshot, "version": 0}
+        # Get Emergent LLM key
+        api_key = os.getenv("EMERGENT_LLM_KEY")
+        if not api_key:
+            return {"error": "API key not configured"}, 500
         
-        return {"snapshot": room.get("snapshot", {}), "version": room.get("version", 0)}
-    except Exception as e:
-        print(f"Error getting snapshot: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/sync/rooms/{room_id}/apply")
-async def apply_updates(room_id: str, update: SnapshotUpdate):
-    """Apply updates to the room snapshot"""
-    try:
-        room = await db.rooms.find_one({"room_id": room_id})
+        # Create chat instance with Claude Sonnet 4
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"canvas-session",
+            system_message="You are a helpful assistant integrated into a collaborative drawing canvas. Provide clear, concise, and helpful responses."
+        ).with_model("anthropic", "claude-sonnet-4-20250514")
         
-        if not room:
-            # Create new room with this snapshot
-            new_room = {
-                "room_id": room_id,
-                "snapshot": update.snapshot,
-                "version": 1,
-                "created_at": datetime.now(timezone.utc),
-                "updated_at": datetime.now(timezone.utc)
-            }
-            await db.rooms.insert_one(new_room)
-            return {"success": True, "version": 1}
+        # Create user message
+        user_message = UserMessage(text=request.prompt)
         
-        # Update existing room
-        new_version = room.get("version", 0) + 1
-        await db.rooms.update_one(
-            {"room_id": room_id},
-            {
-                "$set": {
-                    "snapshot": update.snapshot,
-                    "version": new_version,
-                    "updated_at": datetime.now(timezone.utc)
-                }
+        async def generate():
+            """Generator function to stream responses"""
+            try:
+                # Send message and get streaming response
+                full_response = ""
+                async for chunk in chat.send_message_stream(user_message):
+                    if chunk:
+                        full_response += chunk
+                        # Send each chunk as Server-Sent Events
+                        yield f"data: {json.dumps({'content': chunk})}\n\n"
+                        await asyncio.sleep(0)  # Allow other coroutines to run
+                
+                # Send completion signal
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                error_msg = f"Error during streaming: {str(e)}"
+                yield f"data: {json.dumps({'error': error_msg})}\n\n"
+        
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
             }
         )
-        
-        # Also store in operations log for recovery
-        operation = {
-            "room_id": room_id,
-            "op_id": str(uuid.uuid4()),
-            "snapshot": update.snapshot,
-            "version": new_version,
-            "timestamp": datetime.now(timezone.utc)
-        }
-        await db.operations.insert_one(operation)
-        
-        return {"success": True, "version": new_version}
-    except Exception as e:
-        print(f"Error applying update: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.websocket("/api/ws/rooms/{room_id}")
-async def websocket_endpoint(websocket: WebSocket, room_id: str):
-    await manager.connect(websocket, room_id)
     
-    try:
-        # Send initial connection confirmation
-        await websocket.send_json({
-            "type": "connected",
-            "room_id": room_id,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
-        
-        # Broadcast user joined
-        await manager.broadcast(room_id, {
-            "type": "user_joined",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }, exclude=websocket)
-        
-        while True:
-            data = await websocket.receive_json()
-            
-            # Handle different message types
-            msg_type = data.get("type")
-            
-            if msg_type == "update":
-                # Broadcast updates to all other clients
-                await manager.broadcast(room_id, data, exclude=websocket)
-                
-            elif msg_type == "cursor":
-                # Broadcast cursor position
-                await manager.broadcast(room_id, data, exclude=websocket)
-                
-            elif msg_type == "presence":
-                # Broadcast presence updates
-                await manager.broadcast(room_id, data, exclude=websocket)
-                
-            elif msg_type == "snapshot_request":
-                # Client is requesting the latest snapshot
-                room = await db.rooms.find_one({"room_id": room_id})
-                if room:
-                    await websocket.send_json({
-                        "type": "snapshot",
-                        "snapshot": room.get("snapshot", {}),
-                        "version": room.get("version", 0)
-                    })
-                    
-    except WebSocketDisconnect:
-        manager.disconnect(websocket, room_id)
-        # Broadcast user left
-        await manager.broadcast(room_id, {
-            "type": "user_left",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
     except Exception as e:
-        print(f"WebSocket error: {e}")
-        manager.disconnect(websocket, room_id)
+        return {"error": str(e)}, 500
 
 if __name__ == "__main__":
     import uvicorn
