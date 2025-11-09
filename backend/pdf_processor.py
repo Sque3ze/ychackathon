@@ -91,27 +91,16 @@ class TextChunker:
 
 
 class EmbeddingGenerator:
-    """Generate embeddings using OpenAI client with Emergent integration proxy"""
+    """Generate embeddings using OpenAI API"""
     
     def __init__(self, api_key: str, model: str = "text-embedding-3-small", base_url: str = None):
         self.model = model
         self.api_key = api_key
         self.logger = logging.getLogger(__name__ + '.EmbeddingGenerator')
         
-        # Get Emergent integration proxy URL
-        proxy_url = get_integration_proxy_url()
-        if not proxy_url:
-            raise ValueError("Could not get Emergent integration proxy URL")
-        
-        # Add /v1 to the base URL for OpenAI compatibility
-        full_url = f"{proxy_url}/v1"
-        
-        # Initialize OpenAI client with Emergent proxy
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url=full_url
-        )
-        self.logger.info(f"Initialized with Emergent proxy: {full_url}")
+        # Initialize OpenAI client (direct to OpenAI API)
+        self.client = OpenAI(api_key=api_key)
+        self.logger.info(f"Initialized with OpenAI API for embeddings")
     
     def generate_embeddings(self, texts: List[str], batch_size: int = 100) -> List[List[float]]:
         """
