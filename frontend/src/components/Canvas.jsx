@@ -215,8 +215,14 @@ export default function Canvas() {
           id: 'auto-frame-handwriting',
           label: 'Frame Handwriting',
           kbd: 's',
-          onSelect() {
-            autoFrameHandwriting(editor);
+          async onSelect() {
+            // Create frame and group
+            const frameId = await autoFrameHandwriting(editor);
+            
+            // If frame was created, capture and upload image
+            if (frameId) {
+              await captureAndUploadFrame(editor, frameId);
+            }
           },
         },
       };
