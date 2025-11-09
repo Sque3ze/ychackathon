@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { Tldraw } from 'tldraw';
 import { useSyncDemo } from '@tldraw/sync';
-import { TextResponseShapeUtil } from '../shapeUtils/TextResponseShapeUtil.tsx';
-import { PromptInput } from './PromptInput.tsx';
+import { TextResponseShapeUtil } from '../shapeUtils/TextResponseShapeUtil.jsx';
+import { PromptInput } from './PromptInput.jsx';
 import 'tldraw/tldraw.css';
 
 const FOCUS_EVENT_NAME = 'focus-prompt-input';
