@@ -6,16 +6,21 @@ const isMac = () => {
   return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 };
 
-export const PromptInput = track(({ focusEventName }) => {
+export const PromptInput = ({ focusEventName }) => {
   const editor = useEditor();
   const [isFocused, setIsFocused] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [isCanvasEmpty, setIsCanvasEmpty] = useState(true);
   const showMacKeybinds = isMac();
   const inputRef = useRef(null);
   
-  // These should be stable and not cause re-renders when tracked
-  const isDarkMode = false; // Simplify for now
-  const isCanvasZeroState = editor.getCurrentPageShapes().length === 0;
+  // Check canvas state once on mount
+  useEffect(() => {
+    const checkCanvasState = () => {
+      setIsCanvasEmpty(editor.getCurrentPageShapes().length === 0);
+    };
+    checkCanvasState();
+  }, [editor]);
 
   useEffect(() => {
     const handleFocusEvent = () => {
