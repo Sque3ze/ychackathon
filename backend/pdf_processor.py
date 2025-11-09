@@ -103,12 +103,15 @@ class EmbeddingGenerator:
         if not proxy_url:
             raise ValueError("Could not get Emergent integration proxy URL")
         
+        # Add /v1 to the base URL for OpenAI compatibility
+        full_url = f"{proxy_url}/v1"
+        
         # Initialize OpenAI client with Emergent proxy
         self.client = OpenAI(
             api_key=api_key,
-            base_url=proxy_url
+            base_url=full_url
         )
-        self.logger.info(f"Initialized with Emergent proxy: {proxy_url}")
+        self.logger.info(f"Initialized with Emergent proxy: {full_url}")
     
     def generate_embeddings(self, texts: List[str], batch_size: int = 100) -> List[List[float]]:
         """
