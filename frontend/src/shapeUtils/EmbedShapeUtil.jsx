@@ -71,6 +71,7 @@ const EmbedComponent = memo(({ shape }) => {
       borderRadius: '12px',
       overflow: 'hidden',
       border: '1px solid #E5E7EB',
+      borderLeft: '6px solid #F59E0B',
       background: '#FFFFFF',
       boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
     }}>

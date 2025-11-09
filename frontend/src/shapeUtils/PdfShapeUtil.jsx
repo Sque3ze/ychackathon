@@ -102,6 +102,7 @@ const PdfViewerComponent = memo(({ shape }) => {
       background: 'white',
       borderRadius: '8px',
       border: '1px solid #E5E7EB',
+      borderLeft: '6px solid #3B82F6',
       overflow: 'hidden',
       pointerEvents: 'all'
     }}>

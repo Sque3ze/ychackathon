@@ -155,6 +155,7 @@ const MeetingSummaryComponent = memo(({ shape, editor }) => {
               overflow: "hidden",
               border: "1px solid",
               borderColor: isDarkMode ? "#374151" : "#E5E7EB",
+              borderLeft: "6px solid #14B8A6",
             }}
           >
             <C1Component

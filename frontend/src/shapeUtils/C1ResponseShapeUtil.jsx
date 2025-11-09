@@ -134,6 +134,7 @@ const C1ResponseComponent = memo(({ shape, editor }) => {
             style={{
               background: isDarkMode ? "#111827" : "#FFFFFF",
               borderRadius: "8px",
+              borderLeft: "6px solid #10B981",
               overflow: "hidden",
             }}
           >

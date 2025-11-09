@@ -320,6 +320,7 @@ const VideoCallComponent = memo(({ shape }) => {
       background: '#1F2937',
       borderRadius: '8px',
       border: '1px solid #374151',
+      borderLeft: '6px solid #8B5CF6',
       overflow: 'hidden',
       pointerEvents: 'all'
     }}>

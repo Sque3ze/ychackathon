@@ -8,11 +8,83 @@ const isMac = () => {
   return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 };
 
+// Icon components for each document type
+const DocumentTypeIcon = ({ type, color }) => {
+  const icons = {
+    'pdf': (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+      </svg>
+    ),
+    'video': (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5">
+        <path d="M23 7l-7 5 7 5V7z" />
+        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+      </svg>
+    ),
+    'c1-response': (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <circle cx="12" cy="11" r="1" fill={color} />
+        <circle cx="8" cy="11" r="1" fill={color} />
+        <circle cx="16" cy="11" r="1" fill={color} />
+      </svg>
+    ),
+    'meeting-summary': (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <line x1="10" y1="9" x2="8" y2="9" />
+      </svg>
+    ),
+    'embed': (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5">
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+      </svg>
+    ),
+    'handwriting-note': (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5">
+        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+      </svg>
+    ),
+    'typed-note': (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5">
+        <line x1="17" y1="10" x2="3" y2="10" />
+        <line x1="21" y1="6" x2="3" y2="6" />
+        <line x1="21" y1="14" x2="3" y2="14" />
+        <line x1="17" y1="18" x2="3" y2="18" />
+      </svg>
+    ),
+  };
+
+  return icons[type] || icons['pdf'];
+};
+
+// Color mapping for each type
+const getTypeColor = (type) => {
+  const colors = {
+    'pdf': '#3B82F6',
+    'video': '#8B5CF6',
+    'c1-response': '#10B981',
+    'meeting-summary': '#14B8A6',
+    'embed': '#F59E0B',
+    'handwriting-note': '#FBBF24',
+    'typed-note': '#FBBF24',
+  };
+  return colors[type] || '#6B7280';
+};
+
 export default function PromptInput({ focusEventName }) {
   const editor = useEditor();
   const [isFocused, setIsFocused] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [selectedSourcesCount, setSelectedSourcesCount] = useState(0);
+  const [selectedSources, setSelectedSources] = useState([]);
   const showMacKeybinds = isMac();
   const inputRef = useRef(null);
 
@@ -100,7 +172,7 @@ export default function PromptInput({ focusEventName }) {
     const selectedIds = editor.getSelectedShapeIds();
     if (!selectedIds.length) return [];
 
-    const resolved = new Set();
+    const resolved = new Map(); // Map of id -> type info
 
     selectedIds.forEach((id) => {
       const shape = editor.getShape(id);
@@ -111,11 +183,11 @@ export default function PromptInput({ focusEventName }) {
       while (currentShape) {
         if (currentShape.type === 'frame') {
           if (currentShape.meta?.handwritingNoteId) {
-            resolved.add(currentShape.id);
+            resolved.set(currentShape.id, { type: 'handwriting-note' });
             return;
           }
           if (currentShape.meta?.typedNoteId) {
-            resolved.add(currentShape.id);
+            resolved.set(currentShape.id, { type: 'typed-note' });
             return;
           }
         }
@@ -124,10 +196,18 @@ export default function PromptInput({ focusEventName }) {
         currentShape = parent;
       }
 
-      resolved.add(shape.id);
+      // Determine shape type
+      let shapeType = 'unknown';
+      if (shape.type === 'pdf-viewer') shapeType = 'pdf';
+      else if (shape.type === 'video-call') shapeType = 'video';
+      else if (shape.type === 'c1-response') shapeType = 'c1-response';
+      else if (shape.type === 'meeting-summary') shapeType = 'meeting-summary';
+      else if (shape.type === 'custom-embed') shapeType = 'embed';
+
+      resolved.set(shape.id, { type: shapeType });
     });
 
-    return Array.from(resolved);
+    return Array.from(resolved.entries()).map(([id, info]) => ({ id, ...info }));
   }, [editor]);
 
   useEffect(() => {
@@ -144,12 +224,24 @@ export default function PromptInput({ focusEventName }) {
     };
   }, [focusEventName]);
 
-  // Track selection changes to update source count
+  // Track selection changes to update source count and types
   useEffect(() => {
     const updateSourceCount = () => {
       const resolved = resolveSelectionForContext();
       console.log('Selected sources count:', resolved.length, resolved);
       setSelectedSourcesCount(resolved.length);
+
+      // Group by type to avoid duplicates
+      const typeMap = new Map();
+      resolved.forEach(source => {
+        if (!typeMap.has(source.type)) {
+          typeMap.set(source.type, { ...source, count: 1 });
+        } else {
+          typeMap.get(source.type).count++;
+        }
+      });
+
+      setSelectedSources(Array.from(typeMap.values()));
     };
 
     // Update immediately
@@ -309,7 +401,8 @@ export default function PromptInput({ focusEventName }) {
   const createAITextShape = async (promptText) => {
     if (!promptText.trim()) return;
 
-    const selectedShapeIds = resolveSelectionForContext();
+    const selectedShapeData = resolveSelectionForContext();
+    const selectedShapeIds = selectedShapeData.map(s => s.id);
     const c1ShapeId = createShapeId();
     const newShapeWidth = 600;
     const newShapeHeight = 300;
@@ -515,7 +608,7 @@ export default function PromptInput({ focusEventName }) {
 
   return (
     <>
-      {/* Source count indicator - eyebrow style */}
+      {/* Source count indicator - eyebrow style with stacked icons */}
       <div
         style={{
           position: 'fixed',
@@ -523,32 +616,119 @@ export default function PromptInput({ focusEventName }) {
           bottom: selectedSourcesCount > 0 ? '76px' : '68px',
           transform: 'translateX(-50%)',
           width: isFocused ? '50%' : '400px',
-          padding: '6px 20px',
+          padding: '8px 20px',
           borderRadius: '12px 12px 0 0',
-          background: 'rgba(249, 250, 251, 0.98)',
-          borderTop: '1px solid #E5E7EB',
-          borderLeft: '1px solid #E5E7EB',
-          borderRight: '1px solid #E5E7EB',
-          color: '#6B7280',
+          background: 'linear-gradient(135deg, rgba(239, 246, 255, 0.98) 0%, rgba(219, 234, 254, 0.98) 100%)',
+          borderTop: '1px solid #BFDBFE',
+          borderLeft: '1px solid #BFDBFE',
+          borderRight: '1px solid #BFDBFE',
+          color: '#1E40AF',
           fontSize: '11px',
           fontWeight: '600',
           zIndex: 9999,
           pointerEvents: 'none',
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          justifyContent: 'space-between',
+          gap: '12px',
           opacity: selectedSourcesCount > 0 ? 1 : 0,
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           backdropFilter: 'blur(8px)',
           letterSpacing: '0.025em',
         }}
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-        </svg>
-        {selectedSourcesCount} SOURCE{selectedSourcesCount !== 1 ? 'S' : ''}
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {selectedSourcesCount} SOURCE{selectedSourcesCount !== 1 ? 'S' : ''}
+        </span>
+
+        {/* Stacked icons like collaborator avatars */}
+        <div
+          className="icon-stack"
+          style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto', pointerEvents: 'auto' }}
+        >
+          {selectedSources.slice(0, 6).map((source, index) => (
+            <div
+              key={source.type}
+              className="icon-avatar"
+              data-index={index}
+              style={{
+                position: 'relative',
+                marginLeft: index === 0 ? '0' : '-6px',
+                width: '22px',
+                height: '22px',
+                borderRadius: '50%',
+                backgroundColor: 'white',
+                border: `2px solid ${getTypeColor(source.type)}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                zIndex: selectedSources.length - index,
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                animation: `fadeSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.05}s both`,
+                cursor: 'pointer',
+              }}
+            >
+              <DocumentTypeIcon type={source.type} color={getTypeColor(source.type)} />
+              {source.count > 1 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '50%',
+                    backgroundColor: getTypeColor(source.type),
+                    color: 'white',
+                    fontSize: '8px',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1.5px solid white',
+                  }}
+                >
+                  {source.count}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Add keyframe animation and hover effects */}
+      <style>
+        {`
+          @keyframes fadeSlideIn {
+            from {
+              opacity: 0;
+              transform: translateX(-10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(0);
+            }
+          }
+
+          /* Expand icons on hover */
+          .icon-stack:hover .icon-avatar {
+            margin-left: 4px !important;
+            transform: scale(1.1);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15) !important;
+          }
+
+          .icon-stack:hover .icon-avatar:first-child {
+            margin-left: 0 !important;
+          }
+
+          .icon-stack .icon-avatar:hover {
+            transform: scale(1.25) translateY(-2px) !important;
+            z-index: 1000 !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+          }
+        `}
+      </style>
 
       <form
         style={{
