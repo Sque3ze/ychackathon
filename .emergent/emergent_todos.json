@@ -1,7 +1,7 @@
 [
   {
     "content": "Refactor POC classes into reusable backend modules (pdf_processor.py)",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Add POST /api/pdf/upload endpoint with file validation and processing",
