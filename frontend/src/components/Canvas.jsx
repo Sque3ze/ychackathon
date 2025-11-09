@@ -38,13 +38,13 @@ export default function Canvas() {
     });
   };
 
-  // Helper function to auto-frame handwriting strokes
-  const autoFrameHandwriting = (editor) => {
-    if (!editor) return;
+  // Helper function to auto-frame handwriting strokes and capture image
+  const autoFrameHandwriting = async (editor) => {
+    if (!editor) return null;
 
     // Get selected shape IDs
     const selectedIds = editor.getSelectedShapeIds();
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0) return null;
 
     // Filter to handwriting shapes (draw strokes that aren't closed)
     const handwritingIds = [];
@@ -60,11 +60,11 @@ export default function Canvas() {
       }
     }
 
-    if (handwritingIds.length === 0) return;
+    if (handwritingIds.length === 0) return null;
 
     // Get bounds of selected handwriting shapes
     const bounds = editor.getShapePageBounds(handwritingIds[0]);
-    if (!bounds) return;
+    if (!bounds) return null;
 
     // Calculate bounding box for all selected shapes
     let minX = bounds.x;
@@ -92,10 +92,12 @@ export default function Canvas() {
     const frameWidth = maxX - minX;
     const frameHeight = maxY - minY;
 
+    let frameId = null;
+
     // Wrap all operations in editor.run for proper history/sync
     editor.run(() => {
       // Create frame shape
-      const frameId = createShapeId();
+      frameId = createShapeId();
       editor.createShape({
         id: frameId,
         type: 'frame',
@@ -130,6 +132,78 @@ export default function Canvas() {
 
       // Note: No need to manually select - tldraw automatically selects the group after groupShapes()
     });
+
+    // Return frameId for image capture
+    return frameId;
+  };
+
+  // Helper function to capture and upload frame image
+  const captureAndUploadFrame = async (editor, frameId) => {
+    if (!editor || !frameId) return;
+
+    try {
+      // Capture frame as PNG with 2x scale
+      const result = await editor.getSvgString([frameId], { scale: 2, background: true });
+      
+      if (!result) {
+        console.error('Failed to capture frame image');
+        return;
+      }
+
+      // Convert SVG to blob
+      const svgBlob = new Blob([result.svg], { type: 'image/svg+xml' });
+      
+      // For PNG, we need to render the SVG to canvas first
+      const img = new Image();
+      const svgUrl = URL.createObjectURL(svgBlob);
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = svgUrl;
+      });
+
+      // Create canvas and render image
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      
+      // Clean up
+      URL.revokeObjectURL(svgUrl);
+
+      // Convert canvas to blob
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+
+      if (!blob) {
+        console.error('Failed to create PNG blob');
+        return;
+      }
+
+      // Upload to backend
+      const formData = new FormData();
+      formData.append('file', blob, `${frameId}.png`);
+      formData.append('frameId', frameId);
+      formData.append('timestamp', new Date().toISOString());
+
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+      const response = await fetch(`${backendUrl}/api/handwriting-upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Frame uploaded successfully:', data);
+
+    } catch (error) {
+      console.error('Error capturing or uploading frame:', error);
+      // Don't block UI - just log the error
+    }
   };
 
   // Define custom overrides for keyboard shortcuts and component behavior
