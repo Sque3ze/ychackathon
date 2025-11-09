@@ -1,10 +1,18 @@
 import React, { useEffect } from 'react';
-import { Tldraw, DefaultToolbar } from 'tldraw';
+import { Tldraw, DefaultToolbar, TldrawUiMenuItem, useEditor } from 'tldraw';
 import { useSyncDemo } from '@tldraw/sync';
 import PromptInput from './PromptInput';
 import 'tldraw/tldraw.css';
 
 const FOCUS_EVENT_NAME = 'focus-prompt-input';
+
+function CustomUI() {
+  return (
+    <>
+      <PromptInput focusEventName={FOCUS_EVENT_NAME} />
+    </>
+  );
+}
 
 const components = {
   Toolbar: () => {
@@ -14,6 +22,7 @@ const components = {
       </div>
     );
   },
+  InFrontOfTheCanvas: CustomUI,
 };
 
 export default function Canvas() {
@@ -40,7 +49,5 @@ export default function Canvas() {
         store={store}
         components={components}
       />
-      <PromptInput focusEventName={FOCUS_EVENT_NAME} />
     </div>
-  );
-}
+  );}
