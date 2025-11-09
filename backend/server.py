@@ -56,14 +56,16 @@ async def ask_stream(request: PromptRequest):
         async def generate():
             """Generator function to stream responses"""
             try:
-                # Send message and get streaming response
-                full_response = ""
-                async for chunk in chat.send_message_stream(user_message):
-                    if chunk:
-                        full_response += chunk
-                        # Send each chunk as Server-Sent Events
-                        yield f"data: {json.dumps({'content': chunk})}\n\n"
-                        await asyncio.sleep(0)  # Allow other coroutines to run
+                # Send message and get response
+                # Note: emergentintegrations doesn't have send_message_stream, so we get full response
+                response = await chat.send_message(user_message)
+                
+                # Simulate streaming by sending the response in chunks
+                chunk_size = 10  # characters per chunk
+                for i in range(0, len(response), chunk_size):
+                    chunk = response[i:i + chunk_size]
+                    yield f"data: {json.dumps({'content': chunk})}\n\n"
+                    await asyncio.sleep(0.02)  # Small delay to simulate streaming
                 
                 # Send completion signal
                 yield "data: [DONE]\n\n"
