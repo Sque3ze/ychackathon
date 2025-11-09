@@ -8,11 +8,13 @@ const isMac = () => {
 
 export const PromptInput = track(({ focusEventName }) => {
   const editor = useEditor();
-  const isDarkMode = editor.user.getIsDarkMode();
   const [isFocused, setIsFocused] = useState(false);
   const [prompt, setPrompt] = useState('');
   const showMacKeybinds = isMac();
   const inputRef = useRef(null);
+  
+  // These should be stable and not cause re-renders when tracked
+  const isDarkMode = false; // Simplify for now
   const isCanvasZeroState = editor.getCurrentPageShapes().length === 0;
 
   useEffect(() => {
