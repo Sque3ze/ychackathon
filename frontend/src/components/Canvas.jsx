@@ -114,7 +114,7 @@ export default function Canvas() {
       // Reparent handwriting strokes into the frame
       editor.reparentShapes(handwritingIds, frameId);
 
-      // Group the frame and all strokes
+      // Group the frame and all strokes (tldraw auto-selects the group)
       const groupId = editor.groupShapes([frameId, ...handwritingIds]);
 
       // Lock the group shape to prevent resizing (only allow moving)
@@ -128,10 +128,7 @@ export default function Canvas() {
         });
       }
 
-      // Select the group
-      if (groupId) {
-        editor.select(groupId);
-      }
+      // Note: No need to manually select - tldraw automatically selects the group after groupShapes()
     });
   };
 
