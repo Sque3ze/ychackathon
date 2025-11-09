@@ -31,28 +31,30 @@ export default function PromptInput({ editor, focusEventName }) {
   const createAITextShape = async (promptText) => {
     if (!promptText.trim()) return;
 
-    const noteId = createShapeId();
+    const geoId = createShapeId();
     
     // Get viewport center
     const viewport = editor.getViewportPageBounds();
-    const x = viewport.x + (viewport.w / 2) - 200;
+    const x = viewport.x + (viewport.w / 2) - 300;
     const y = viewport.y + (viewport.h / 2) - 150;
     
-    // Create NOTE shape ON THE CANVAS (sticky notes support text)
+    // Create GEO shape (rectangle) ON THE CANVAS - these support text!
     editor.createShape({
-      id: noteId,
-      type: 'note',
+      id: geoId,
+      type: 'geo',
       x,
       y,
       props: {
+        geo: 'rectangle',
+        w: 600,
+        h: 300,
         color: 'light-blue',
-        size: 'l',
-        text: `Q: ${promptText}\n\nAI: Thinking...`,
+        fill: 'semi',
       },
     });
     
     // Zoom to the shape
-    editor.zoomToSelection([noteId], { duration: 200, inset: 100 });
+    editor.zoomToSelection([geoId], { duration: 200, inset: 100 });
     
     try {
       // Stream AI response
@@ -67,6 +69,9 @@ export default function PromptInput({ editor, focusEventName }) {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let aiResponse = '';
+      
+      // Start editing the shape to add text
+      editor.setEditingShape(geoId);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -85,12 +90,13 @@ export default function PromptInput({ editor, focusEventName }) {
               if (parsed.content) {
                 aiResponse += parsed.content;
                 
-                // Update NOTE shape ON THE CANVAS with streaming text
+                // Update shape text by setting editing value
+                const textContent = `Q: ${promptText}\n\nAI: ${aiResponse}`;
                 editor.updateShape({
-                  id: noteId,
-                  type: 'note',
+                  id: geoId,
+                  type: 'geo',
                   props: {
-                    text: `Q: ${promptText}\n\nAI: ${aiResponse}`,
+                    text: textContent,
                   },
                 });
               }
@@ -100,14 +106,18 @@ export default function PromptInput({ editor, focusEventName }) {
           }
         }
       }
+      
+      // Stop editing
+      editor.setEditingShape(null);
+      
     } catch (error) {
       console.error('AI request failed:', error);
       editor.updateShape({
-        id: noteId,
-        type: 'note',
+        id: geoId,
+        type: 'geo',
         props: {
-          text: `Q: ${promptText}\n\nAI: Error - ${error.message}`,
           color: 'light-red',
+          text: `Q: ${promptText}\n\nAI: Error - ${error.message}`,
         },
       });
     }
