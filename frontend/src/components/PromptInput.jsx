@@ -1,17 +1,22 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useEditor } from 'tldraw';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { track, useEditor } from 'tldraw';
 import { createTextResponseShape } from '../utils/textShapeManager';
 
 const isMac = () => {
   return typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 };
 
-export const PromptInput = ({ focusEventName }) => {
+export const PromptInput = track(({ focusEventName }) => {
   const editor = useEditor();
   const [isFocused, setIsFocused] = useState(false);
   const [prompt, setPrompt] = useState('');
   const showMacKeybinds = isMac();
   const inputRef = useRef(null);
+  
+  // FIXED: Use useMemo to track canvas state properly
+  const isCanvasZeroState = useMemo(() => {
+    return editor.getCurrentPageShapes().length === 0;
+  }, [editor]);
 
   useEffect(() => {
     const handleFocusEvent = () => {
@@ -28,13 +33,15 @@ export const PromptInput = ({ focusEventName }) => {
   }, [focusEventName]);
 
   const onInputSubmit = async (promptText) => {
+    if (!promptText.trim()) return; // Prevent empty submissions
+    
     setPrompt('');
     setIsFocused(false);
     if (inputRef.current) inputRef.current.blur();
     
     try {
       await createTextResponseShape(editor, {
-        searchQuery: promptText,
+        searchQuery: promptText.trim(),
         width: 600,
         height: 300,
         centerCamera: true,
@@ -52,26 +59,26 @@ export const PromptInput = ({ focusEventName }) => {
         alignItems: 'center',
         position: 'fixed',
         left: '50%',
-        bottom: '16px',
         transform: 'translateX(-50%)',
         padding: '12px 20px',
         borderRadius: '16px',
         border: '1px solid #E5E7EB',
         fontSize: '16px',
-        transition: 'width 0.3s ease-in-out',
+        transition: 'all 0.3s ease-in-out',
         gap: '8px',
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
         minHeight: '60px',
         width: isFocused ? '50%' : '400px',
+        top: isCanvasZeroState ? '50%' : 'auto',
+        bottom: isCanvasZeroState ? 'auto' : '16px',
+        marginTop: isCanvasZeroState ? '-30px' : '0',
         background: '#FFFFFF',
         color: '#111827',
         zIndex: 1000,
       }}
       onSubmit={(e) => {
         e.preventDefault();
-        if (prompt.trim()) {
-          onInputSubmit(prompt);
-        }
+        onInputSubmit(prompt);
       }}
     >
       <input
@@ -95,6 +102,7 @@ export const PromptInput = ({ focusEventName }) => {
       {isFocused ? (
         <button
           type="submit"
+          disabled={!prompt.trim()}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -103,9 +111,9 @@ export const PromptInput = ({ focusEventName }) => {
             height: '36px',
             borderRadius: '8px',
             border: 'none',
-            background: '#3B82F6',
+            background: prompt.trim() ? '#3B82F6' : '#CBD5E1',
             color: '#FFFFFF',
-            cursor: 'pointer',
+            cursor: prompt.trim() ? 'pointer' : 'not-allowed',
           }}
           onMouseDown={(e) => {
             e.preventDefault();
@@ -120,4 +128,4 @@ export const PromptInput = ({ focusEventName }) => {
       )}
     </form>
   );
-};
+});

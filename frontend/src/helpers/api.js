@@ -7,10 +7,12 @@ export const makeApiCall = async ({
   onResponseStreamEnd,
   additionalContext,
 }) => {
+  let abortController = null;
+  
   try {
+    abortController = new AbortController();
     if (onResponseStreamStart) onResponseStreamStart();
 
-    // Call FastAPI backend
     const response = await fetch(`${backendUrl}/api/ask`, {
       method: 'POST',
       headers: {
@@ -20,6 +22,7 @@ export const makeApiCall = async ({
         prompt: searchQuery,
         context: additionalContext,
       }),
+      signal: abortController.signal,
     });
 
     if (!response.ok) {
@@ -37,6 +40,7 @@ export const makeApiCall = async ({
 
     while (true) {
       const { done, value } = await reader.read();
+      
       if (done) break;
 
       const chunk = decoder.decode(value, { stream: true });
@@ -44,7 +48,7 @@ export const makeApiCall = async ({
 
       for (const line of lines) {
         if (line.startsWith('data: ')) {
-          const data = line.slice(6); // Remove "data: " prefix
+          const data = line.slice(6);
 
           if (data === '[DONE]') {
             break;
@@ -60,15 +64,21 @@ export const makeApiCall = async ({
               throw new Error(parsed.error);
             }
           } catch (e) {
-            // Skip invalid JSON
+            // Skip invalid JSON - might be partial chunk
+            continue;
           }
         }
       }
     }
   } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log('Request aborted');
+      return;
+    }
     console.error('Error in makeApiCall:', error);
     throw error;
   } finally {
     if (onResponseStreamEnd) onResponseStreamEnd();
+    if (abortController) abortController.abort();
   }
 };
